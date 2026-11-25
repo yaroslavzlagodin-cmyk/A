@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using BrokenHeart.Inventory;
+using BrokenHeart.World;
 
 namespace BrokenHeart.Player
 {
@@ -14,6 +15,7 @@ namespace BrokenHeart.Player
         private Rigidbody2D body;
         private BoxCollider2D shape;
         private PlayerInventory inventory;
+        private BlockWorld world;
         private readonly RaycastHit2D[] groundHits = new RaycastHit2D[8];
         private ContactFilter2D groundFilter;
         private float move;
@@ -29,6 +31,7 @@ namespace BrokenHeart.Player
             body = GetComponent<Rigidbody2D>();
             shape = GetComponent<BoxCollider2D>();
             inventory = GetComponent<PlayerInventory>();
+            world = FindAnyObjectByType<BlockWorld>();
             spawn = body.position;
             groundFilter.SetLayerMask(groundLayers);
             groundFilter.useTriggers = false;
@@ -61,7 +64,12 @@ namespace BrokenHeart.Player
             }
             body.linearVelocity = velocity;
             // Prototype recovery when walking off the finite test world.
-            if (body.position.y < FallBoundary) { body.position = spawn; body.linearVelocity = Vector2.zero; }
+            if (body.position.y < FallBoundary)
+            {
+                world?.PrepareCollisionAt(spawn);
+                body.position = spawn;
+                body.linearVelocity = Vector2.zero;
+            }
         }
         private void OnApplicationFocus(bool focused)
         {

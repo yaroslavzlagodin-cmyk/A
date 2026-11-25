@@ -7,8 +7,11 @@ using UnityEngine.Tilemaps;
 
 namespace BrokenHeart.World
 {
+    [DefaultExecutionOrder(-5)]
     public sealed class BlockWorld : MonoBehaviour
     {
+        private const int CollisionRadius = 1;
+        private const int ChunksPerFrame = 3;
         [SerializeField] private Tilemap tilemap;
         [SerializeField] private BlockData[] palette;
         [SerializeField] private int seed = 1207;
@@ -18,13 +21,25 @@ namespace BrokenHeart.World
         // Controls both the shadow mask and depth tint on terrain tiles.
         [SerializeField] private bool terrainShadowsEnabled = false;
         private readonly HashSet<Vector2Int> visible = new();
-        private Vector2Int lastChunk = new(int.MinValue, int.MinValue);
+        private readonly HashSet<Vector2Int> wanted = new();
+        private readonly List<Vector2Int> leaving = new();
+        private readonly List<Vector2Int> pending = new();
+        private static readonly Vector2Int UnsetChunk = new(int.MinValue, int.MinValue);
+        private Vector2Int lastChunk = UnsetChunk;
+        private Vector2Int lastCollisionChunk = UnsetChunk;
         private RectInt lastCameraChunks;
+        private int pendingIndex;
+        private TileChangeData[] tiles;
+        private TileChangeData[] walls;
+        private TileBase[] emptyTiles;
+        private System.Comparison<Vector2Int> compareChunkDistance;
         private readonly Dictionary<string, BlockData> definitions = new();
         private readonly HashSet<Vector2Int> explored = new();
         private Tilemap background;
+        private TilemapCollider2D terrainCollider;
         private DayNightSystem clock;
         private PlayerInventory inventory;
+        private Rigidbody2D observerBody;
         private Camera view;
         private CameraFollow cameraFollow;
         private Vector2Int lastSurveyOrigin;
@@ -38,6 +53,12 @@ namespace BrokenHeart.World
         public WorldGenerationData Generation => generation;
         public TerrainGenerator Generator { get; private set; }
         public int VisibleChunks => visible.Count;
+        internal bool HasLoadedTerrain(Vector2 position)
+        {
+            var cell = CellAt(position);
+            return Store is not ChunkBlockStore chunks || !Bounds.Contains(cell) ||
+                visible.Contains(chunks.ChunkAt(cell));
+        }
         public int ExplorationRevision { get; private set; }
         internal int TerrainRevision { get; private set; }
         internal bool TerrainShadowsEnabled => terrainShadowsEnabled;
@@ -59,11 +80,17 @@ namespace BrokenHeart.World
             clock = GetComponent<DayNightSystem>();
             view = Camera.main;
             if (view != null) cameraFollow = view.GetComponent<CameraFollow>();
-            if (observer != null) inventory = observer.GetComponent<PlayerInventory>();
-            var walls = new GameObject("Background Walls", typeof(Tilemap), typeof(TilemapRenderer));
-            walls.transform.SetParent(tilemap.transform, false);
-            background = walls.GetComponent<Tilemap>();
-            var renderer = walls.GetComponent<TilemapRenderer>();
+            if (observer != null)
+            {
+                inventory = observer.GetComponent<PlayerInventory>();
+                observerBody = observer.GetComponent<Rigidbody2D>();
+            }
+            terrainCollider = tilemap.GetComponent<TilemapCollider2D>();
+            compareChunkDistance = CompareChunkDistance;
+            var backgroundObject = new GameObject("Background Walls", typeof(Tilemap), typeof(TilemapRenderer));
+            backgroundObject.transform.SetParent(tilemap.transform, false);
+            background = backgroundObject.GetComponent<Tilemap>();
+            var renderer = backgroundObject.GetComponent<TilemapRenderer>();
             var foreground = tilemap.GetComponent<TilemapRenderer>();
             renderer.sharedMaterial = foreground.sharedMaterial;
             renderer.sortingLayerID = foreground.sortingLayerID;
@@ -76,7 +103,11 @@ namespace BrokenHeart.World
         public void ResetWorld(int newSeed, int? version = null)
         {
             if (Store != null) Store.Changed -= RenderCell;
-            seed = newSeed; visible.Clear(); lastChunk = new Vector2Int(int.MinValue, int.MinValue);
+            seed = newSeed;
+            visible.Clear();
+            pending.Clear();
+            pendingIndex = 0;
+            lastChunk = lastCollisionChunk = UnsetChunk;
             explored.Clear();
             surveyDirty = true;
             ExplorationRevision++;
@@ -87,12 +118,29 @@ namespace BrokenHeart.World
             Store = generation != null ? new ChunkBlockStore(bounds, generation.chunkSize, Generator) : new BlockStore(bounds);
             Store.Changed += RenderCell;
             if (generation == null) TestTerrain.Fill(Store, bounds, seed, palette[0].Id, palette[1].Id, palette[2].Id);
-            else RefreshVisible(true);
+            else
+            {
+                int cellCount = generation.chunkSize * generation.chunkSize;
+                if (tiles?.Length != cellCount)
+                {
+                    tiles = new TileChangeData[cellCount];
+                    walls = new TileChangeData[cellCount];
+                    emptyTiles = new TileBase[cellCount];
+                }
+                if (observer != null) PrepareCollisionAt(ObserverPosition);
+            }
         }
         private void Update()
         {
             if (Generator == null || observer == null) return;
             Survey();
+        }
+
+        private Vector2 ObserverPosition => observerBody != null ? observerBody.position : (Vector2)observer.position;
+
+        private void FixedUpdate()
+        {
+            if (observer != null) PrepareCollisionAt(ObserverPosition);
         }
 
         private void LateUpdate() => RefreshVisible(false);
@@ -165,53 +213,109 @@ namespace BrokenHeart.World
         public void RefreshVisible(bool force)
         {
             if (!(Store is ChunkBlockStore chunks) || observer == null) return;
-            var center = chunks.ChunkAt(CellAt(observer.position));
+            var center = chunks.ChunkAt(CellAt(ObserverPosition));
+            PlanVisibleWindow(chunks, center);
+            PrepareCollisionCore(chunks, center);
+            int budget = force ? pending.Count : ChunksPerFrame;
+            while (pendingIndex < pending.Count && budget > 0)
+                if (RenderChunk(chunks, pending[pendingIndex++])) budget--;
+            if (force) FlushColliders();
+        }
+
+        // Synchronize the destination before a teleport, load, or physics step can enter it.
+        internal void PrepareCollisionAt(Vector2 position)
+        {
+            if (Store is ChunkBlockStore chunks && observer != null)
+            {
+                var center = chunks.ChunkAt(CellAt(position));
+                PlanVisibleWindow(chunks, center);
+                PrepareCollisionCore(chunks, center);
+            }
+            FlushColliders();
+        }
+
+        private void PrepareCollisionCore(ChunkBlockStore chunks, Vector2Int center)
+        {
+            if (center == lastCollisionChunk) return;
+            lastCollisionChunk = center;
+            RenderChunk(chunks, center);
+            for (int y = -CollisionRadius; y <= CollisionRadius; y++)
+                for (int x = -CollisionRadius; x <= CollisionRadius; x++)
+                    RenderChunk(chunks, center + new Vector2Int(x, y));
+        }
+
+        private void FlushColliders()
+        {
+            if (terrainCollider != null && terrainCollider.hasTilemapChanges)
+                terrainCollider.ProcessTilemapChanges();
+        }
+
+        private void PlanVisibleWindow(ChunkBlockStore chunks, Vector2Int center)
+        {
             var cameraChunks = GetZoomedOutCameraChunks(chunks);
-            if (!force && center == lastChunk && cameraChunks.Equals(lastCameraChunks)) return;
+            if (center == lastChunk && cameraChunks.Equals(lastCameraChunks)) return;
             lastChunk = center;
             lastCameraChunks = cameraChunks;
-            var wanted = new HashSet<Vector2Int>();
-            int size = generation.chunkSize;
-            var empty = new TileBase[size * size];
+            wanted.Clear();
             for (int y = -generation.viewRadius; y <= generation.viewRadius; y++)
                 for (int x = -generation.viewRadius; x <= generation.viewRadius; x++) wanted.Add(center + new Vector2Int(x, y));
             foreach (var chunk in cameraChunks.allPositionsWithin) wanted.Add(chunk);
+            leaving.Clear();
             foreach (var chunk in visible)
-                if (!wanted.Contains(chunk))
-                {
-                    var area = new BoundsInt(chunk.x * size, chunk.y * size, 0, size, size, 1);
-                    tilemap.SetTilesBlock(area, empty);
-                    background.SetTilesBlock(area, empty);
-                    chunks.Unload(chunk);
-                }
-            foreach (var chunk in wanted)
+                if (!wanted.Contains(chunk)) leaving.Add(chunk);
+            int size = chunks.ChunkSize;
+            foreach (var chunk in leaving)
             {
-                if (!force && visible.Contains(chunk)) continue;
-                var tiles = new TileChangeData[size * size];
-                var walls = new TileChangeData[size * size];
-                var origin = chunk * size;
-                for (int x = 0; x < size; x++)
-                {
-                    int surface = Generator.Surface(origin.x + x);
-                    for (int y = 0; y < size; y++)
-                    {
-                        int index = y * size + x;
-                        var cell = origin + new Vector2Int(x, y);
-                        int depth = surface - cell.y;
-                        var block = Get(cell);
-                        var wall = Bounds.Contains(cell) ? Generator.Background(depth) : null;
-                        TileBase tile = block != null ? block.Tile : null;
-                        TileBase wallTile = wall != null ? wall.Tile : null;
-                        tiles[index] = new TileChangeData((Vector3Int)cell, tile,
-                            tile != null ? ForegroundColor(depth) : Color.white, TileTransform(tile));
-                        walls[index] = new TileChangeData((Vector3Int)cell, wallTile,
-                            WallColor(depth), TileTransform(wallTile));
-                    }
-                }
-                tilemap.SetTiles(tiles, true);
-                background.SetTiles(walls, true);
+                var area = new BoundsInt(chunk.x * size, chunk.y * size, 0, size, size, 1);
+                tilemap.SetTilesBlock(area, emptyTiles);
+                background.SetTilesBlock(area, emptyTiles);
+                chunks.Release(chunk);
+                visible.Remove(chunk);
             }
-            visible.Clear(); foreach (var chunk in wanted) visible.Add(chunk);
+
+            pending.Clear();
+            foreach (var chunk in wanted)
+                if (!visible.Contains(chunk)) pending.Add(chunk);
+            pending.Sort(compareChunkDistance);
+            pendingIndex = 0;
+        }
+
+        private int CompareChunkDistance(Vector2Int a, Vector2Int b)
+        {
+            int distance = (a - lastChunk).sqrMagnitude.CompareTo((b - lastChunk).sqrMagnitude);
+            if (distance != 0) return distance;
+            int row = a.y.CompareTo(b.y);
+            return row != 0 ? row : a.x.CompareTo(b.x);
+        }
+
+        private bool RenderChunk(ChunkBlockStore chunks, Vector2Int chunk)
+        {
+            if (!visible.Add(chunk)) return false;
+            int size = chunks.ChunkSize;
+            var origin = chunk * size;
+            if (!bounds.Overlaps(new RectInt(origin, Vector2Int.one * size))) return true;
+            chunks.Pin(chunk);
+            for (int x = 0; x < size; x++)
+            {
+                int surface = Generator.Surface(origin.x + x);
+                for (int y = 0; y < size; y++)
+                {
+                    int index = y * size + x;
+                    var cell = origin + new Vector2Int(x, y);
+                    int depth = surface - cell.y;
+                    var block = ResolveBlock(chunks.Peek(cell));
+                    var wall = Bounds.Contains(cell) ? Generator.Background(depth) : null;
+                    TileBase tile = block != null ? block.Tile : null;
+                    TileBase wallTile = wall != null ? wall.Tile : null;
+                    tiles[index] = new TileChangeData((Vector3Int)cell, tile,
+                        tile != null ? ForegroundColor(depth) : Color.white, TileTransform(tile));
+                    walls[index] = new TileChangeData((Vector3Int)cell, wallTile,
+                        WallColor(depth), TileTransform(wallTile));
+                }
+            }
+            tilemap.SetTiles(tiles, true);
+            background.SetTiles(walls, true);
+            return true;
         }
 
         private RectInt GetZoomedOutCameraChunks(ChunkBlockStore chunks)
@@ -235,8 +339,9 @@ namespace BrokenHeart.World
 
         public Vector2Int CellAt(Vector3 position) => (Vector2Int)tilemap.WorldToCell(position);
         public Vector3 Center(Vector2Int cell) => tilemap.GetCellCenterWorld((Vector3Int)cell);
-        public BlockData Get(Vector2Int cell) => Store != null && Store.Get(cell) is string id
-            && definitions.TryGetValue(id, out var data) ? data : null;
+        public BlockData Get(Vector2Int cell) => ResolveBlock(Store?.Get(cell));
+        public BlockData Peek(Vector2Int cell) => ResolveBlock(Store is ChunkBlockStore chunks ? chunks.Peek(cell) : Store?.Get(cell));
+        private BlockData ResolveBlock(string id) => id != null && definitions.TryGetValue(id, out var data) ? data : null;
         public bool Set(Vector2Int cell, BlockData block)
         {
             if (block != null && (!definitions.TryGetValue(block.Id, out var known) || known != block)) return false;

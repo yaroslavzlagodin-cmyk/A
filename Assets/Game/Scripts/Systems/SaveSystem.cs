@@ -249,9 +249,8 @@ namespace BrokenHeart.Systems
             stations?.Clear();
             world.ResetWorld(data.seed, data.generatorVersion);
             foreach (var edit in data.blocks) world.Store.Set(new Vector2Int(edit.x, edit.y), string.IsNullOrEmpty(edit.id) ? null : edit.id);
-            world.RefreshVisible(true);
+            world.PrepareCollisionAt(body.position);
             world.RestoreExploration(data.explored);
-            world.Map.GetComponent<UnityEngine.Tilemaps.TilemapCollider2D>().ProcessTilemapChanges();
             foreach (var drop in UnityEngine.Object.FindObjectsByType<ItemDrop>()) { drop.gameObject.SetActive(false); Destroy(drop.gameObject); }
             var spawner = world.GetComponent<DropSpawner>();
             foreach (var drop in data.drops) spawner.Spawn(inventory.Catalog.Find(drop.id), drop.count, drop.position, inventory.GetComponent<Collider2D>());
