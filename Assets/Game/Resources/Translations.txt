@@ -1,0 +1,268 @@
+Дубові дошки	Oak Planks
+Кам’яна цегла	Stone Bricks
+Замшілий бут	Mossy Rubble
+Замшіла кам’яна цегла	Mossy Stone Bricks
+Нова подорож  →	New journey  →
+Продовжити подорож	Continue journey
+Налаштування	Settings
+Вийти з гри	Quit game
+Завершити гру?	Quit the game?
+У СВІТІ ЗАБУТИХ СПОГАДІВ	IN A WORLD OF FORGOTTEN MEMORIES
+Кожна подорож починається\nз уламка пам'яті.	Every journey begins\nwith a fragment of memory.
+ОСТАННЯ ПОДОРОЖ	LAST JOURNEY
+ТВОЯ ІСТОРІЯ ЩЕ НЕ НАПИСАНА	YOUR STORY IS YET TO BE WRITTEN
+Створи героя. Досліджуй світ. Знайди себе.	Create a hero. Explore the world. Find yourself.
+ДОСЛІДЖЕННЯ   /   БУДІВНИЦТВО   /   ТАЄМНИЦІ	EXPLORATION   /   BUILDING   /   MYSTERIES
+ГЕРОЇ	HEROES
+До головного меню	Main menu
+Створити персонажа	Create character
+Персонажів ще немає. Створи свого першого мандрівника.	No characters yet. Create your first wanderer.
+подорож завершено	journey ended
+Складність	Difficulty
+Обрати	Select
+Редагувати	Edit
+Прибрати героя	Remove character
+з бібліотеки?	from the library?
+СТВОРЕННЯ ПЕРСОНАЖА	CREATE CHARACTER
+НАЛАШТУВАННЯ ПЕРСОНАЖА	EDIT CHARACTER
+До бібліотеки	Back to library
+Випадково	Randomize
+Зберегти й грати	Save and play
+Зберегти	Save
+Введи ім'я героя.	Enter a character name.
+ІМ'Я МАНДРІВНИКА	WANDERER'S NAME
+ПОХОДЖЕННЯ	ORIGIN
+ВИПРОБУВАННЯ	CHALLENGE
+Людина — допитливий мандрівник, що шукає загублені таємниці.	A curious wanderer seeking lost secrets.
+Гном — мешканець підземних залів і знавець давніх копалень.	A dweller of underground halls and ancient mines.
+Голем — кам'яний вартовий, пробуджений енергією глибин.	A stone guardian awakened by energy from the depths.
+Орк — відважний воїн, якого кличуть невідомі землі.	A brave warrior called to unexplored lands.
+Ельф — уважний дослідник лісів і забутих стежок.	A keen explorer of forests and forgotten trails.
+Людина	Human
+Гном	Dwarf
+Голем	Golem
+Орк	Orc
+Ельф	Elf
+Спокійна подорож — менша шкода, речі зберігаються.	Peaceful journey — reduced damage, keep items on death.
+Звичайна подорож — речі зберігаються після смерті.	Normal journey — keep items on death.
+Випробування — після смерті випадає половина матеріалів.	Challenging — drop half of your materials on death.
+Сувора подорож — після смерті випадають інструменти й механізми.	Harsh journey — drop tools and devices on death.
+Екстремальна подорож — після смерті випадає весь інвентар.	Extreme journey — drop your entire inventory on death.
+Одна спроба — остаточна смерть героя.	One chance — permanent character death.
+Спокійна	Peaceful
+Звичайна	Normal
+Випробування	Challenging
+Сувора	Harsh
+Екстремальна	Extreme
+Одна спроба	One chance
+СВІТИ	WORLDS
+До героїв	Back to heroes
+Створити світ	Create world
+Світів ще немає. Створи нову подорож.	No worlds yet. Create a new journey.
+Грати	Play
+Прибрати світ	Remove world
+СТВОРЕННЯ СВІТУ	CREATE WORLD
+НАЛАШТУВАННЯ СВІТУ	EDIT WORLD
+РЕЛЬЄФ І БІОМИ	TERRAIN & BIOMES
+Розмір світу	World size
+Малий	Small
+Середній	Medium
+Великий	Large
+Гігантський	Huge
+Безпечний спавн у центрі	Safe spawn in the center
+Печери й підземні тунелі	Caves and underground tunnels
+Назва світу	World name
+Багатство ресурсів	Resource abundance
+Мирна	Peaceful
+Легка	Easy
+Нормальна	Normal
+Важка	Hard
+Хардкор	Hardcore
+Парад смерті	Death march
+Захмарне	Abundant
+Багате	Rich
+Середнє	Normal
+Бідне	Sparse
+Тотальна нестача	Scarce
+остаточна загибель героя.	permanent character death.
+Seed генерації — число або текст	World seed — number or text
+Високі гори: 	High mountains: 
+Увімкнено	On
+Вимкнено	Off
+Висота гір	Mountain height
+Ширина пагорбів	Hill width
+Розмір біомів	Biome size
+Розташування біомів	Biome arrangement
+Мішані	Mixed
+Від центру	Outward
+Хвилями	Waves
+Світ уже відвідано: можна змінити назву. Для іншої генерації створи новий світ.	This world has been visited: only the name can change. Create a new world for different terrain.
+Введи назву світу.	Enter a world name.
+Спочатку обери живого героя.	Select a living hero first.
+НАЛАШТУВАННЯ ЕКРАНА	DISPLAY SETTINGS
+← Назад	← Back
+РЕЖИМ ВІДОБРАЖЕННЯ	DISPLAY MODE
+У вікні	Windowed
+Повний екран	Fullscreen
+РОЗМІР ВІКНА	WINDOW SIZE
+ОБМЕЖЕННЯ КАДРІВ	FRAME RATE LIMIT
+КОМФОРТНА ПОДОРОЖ	A COMFORTABLE JOURNEY
+У вікні — вибраний розмір.\n\nПовний екран — без рамки, у роздільності твого монітора.\n\nРозмір вікна запам'ятовується для повернення з повного екрана.	Windowed uses the selected size.\n\nFullscreen is borderless at your monitor's resolution.\n\nThe window size is remembered when leaving fullscreen.
+У редакторі розмір задає Game View. Режим вікна діє у зібраній грі.	In the Editor, Game View controls the size. Window modes apply in the built game.
+Налаштування збережуться для наступного запуску.	Settings are remembered for your next launch.
+Застосувати	Apply
+Скинути до 1280 × 720	Reset to 1280 × 720
+Налаштування екрана збережено.	Display settings saved.
+МОВА	LANGUAGE
+Прокидається новий світ…	A new world awakens…
+Скасувати	Cancel
+Підтвердити	Confirm
+НЕ ВДАЛОСЯ ЗАВАНТАЖИТИ	LOAD FAILED
+ПАУЗА	PAUSED
+Продовжити	Resume
+Зберегти й до головного меню	Save and return to menu
+До меню без збереження	Return without saving
+ВІДНОВЛЕНІ РЕЦЕПТИ	RECOVERED RECIPES
+A/D: рух   Space: стрибок   ЛКМ: копати   ПКМ: ставити   E/Tab: речі	A/D: move   Space: jump   LMB: mine   RMB: place   E/Tab: inventory
+1-9: швидкий доступ	1-9: hotbar
+Порожня рука	Empty hand
+Добування:	Mining:
+РЮКЗАК / перетягування; ПКМ — половина стака	BACKPACK / drag to move; RMB drag = half stack
+СВІТ / 	WORLD / 
+F: атака   F6: погода   F7: +6 годин	F: attack   F6: weather   F7: +6 hours
+Зерно 	Seed 
+ / чанки 	 / chunks 
+F5 зберегти / F9 завантажити	F5 save / F9 load
+ГЛУЗД 	SANITY 
+Ноксель: 	Noxel: 
+ліс	forest
+гори	mountains
+Ясно	Clear
+Дощ	Rain
+Туман	Fog
+Гроза	Storm
+Трава із землею	Grass
+Земля	Dirt
+Камінь	Stone
+Деревина	Wood
+Листя	Leaves
+Мідь	Copper
+Залізо	Iron
+Кристал	Crystal
+Бут	Ruin
+Трав'яний покрив	Grass Cover
+Кам'яна кирка	Stone Pickaxe
+Залізна кирка	Iron Pickaxe
+Кам’яна сокира	Stone Axe
+Кам’яна лопата	Stone Shovel
+Кам’яний меч	Stone Sword
+Залізний меч	Iron Sword
+Верстак	Workbench
+Піч	Furnace
+Скриня	Chest
+Ручний крафт	Hand crafting
+Більше рецептів на верстаку	More recipes at a workbench
+Потрібен верстак	Requires a workbench
+Руда	Ore input
+Паливо	Fuel
+Готові злитки	Ingot output
+Жар	Heat
+Додай руду та дерево або дошки	Add ore and wood or planks
+ПКМ — відкрити	RMB to open
+Шматочки мідної руди	Raw Copper
+Шматочки залізної руди	Raw Iron
+Мідний злиток	Copper Ingot
+Залізний злиток	Iron Ingot
+Мідна кирка	Copper Pickaxe
+Мідна сокира	Copper Axe
+Залізна сокира	Iron Axe
+Залізна лопата	Iron Shovel
+Кристалічний фокус	Crystal Focus
+Кристалічний генератор	Crystal Generator
+Кристалічна лампа	Crystal Lamp
+Інструменти	Tools
+Блоки	Blocks
+Магія	Magic
+Механізми	Mechanisms
+Невідомий рецепт	Unknown recipe
+Знайди 	Find 
+Віднови спогад про захист розуму	Recover the mind-protection memory
+Бракує матеріалів	Missing materials
+Рюкзак повний	Backpack full
+Створити	Craft
+Спогад відновлено: 	Memory restored: 
+Кристалічний фокус захищає розум, коли вибраний.	Crystal Focus protects the mind when held.
+Світ, речі та спогади збережено	Saved world, backpack and memories
+Збереження завантажено	Save loaded
+Не вдалося зберегти: 	Save failed: 
+Не вдалося завантажити: 	Load failed: 
+H: сон 8с / F8: глузд -20 (тест)	H: rest 8s / F8: sanity -20 (debug)
+Знайди безпечне місце для сну	Cannot rest: find safe ground
+Відпочинок… рух перериває сон	Resting... movement cancels
+Сон перервано	Sleep interrupted
+Відпочив. H — спати знову	Rested. H to rest again
+Спогад? Ти впевнений, що він твій?	A memory? Are you quite sure it belongs to you?
+Ось. Тепер ти нарешті бачиш свою компанію.	There. Now you can finally see the company you keep.
+Чудове місце, щоб забути, хто ти.	A lovely place to forget who you are.
+Будуй свій притулок. Я люблю спостерігати.	Build your little shelter. I enjoy watching.
+Усе тут пам'ятає тебе. Як ніяково.	Everything here remembers you. How awkward.
+Не озирайся. Жартую. Майже.	Don't turn around. I'm joking. Mostly.
+Ті очі? Може, тобі варто поспати.	Those eyes? Perhaps you should sleep.
+Ти називаєш їх тінями. Як ввічливо.	You call them shadows. How polite.
+Інвентар	Inventory
+Спорядження	Equipment
+Закрити	Close
+Сховище	Storage
+Сортувати	Sort
+Скласти такі самі	Deposit matching
+Забрати такі самі	Take matching
+Утримуй Ctrl + ЛКМ і проведи по слотах	Hold Ctrl + LMB and sweep slots to move stacks
+слотів	slots
+Усі рецепти	All recipes
+Броня	Armor
+Верстати й механізми	Workbenches and mechanisms
+Рюкзаки	Backpacks
+Рюкзак	Backpack
+Похідний рюкзак	Trail Backpack
+Шолом	Helmet
+Нагрудник	Chestplate
+Поножі	Leggings
+Чоботи	Boots
+Лампа	Lamp
+Щит	Shield
+Залізний шолом	Iron Helmet
+Залізний нагрудник	Iron Chestplate
+Залізні поножі	Iron Leggings
+Залізні чоботи	Iron Boots
+Дерев’яний щит	Wooden Shield
+шкоди	damage
+Звільни останній ряд і перенеси рюкзак у порожній слот	Free the last row and move the backpack to an empty slot
+Мінікарта	Minimap
+Карта	Map
+Карта світу	World map
+Увесь світ	Whole world
+Знайти гравця	Find player
+Гравець	Player
+День	Day
+Денний час	Daylight
+Ніч	Nighttime
+Здоров’я	Health
+Глузд	Sanity level
+Зерно	Seed
+Перетягуй карту   ·   Коліщатко змінює масштаб	Drag to pan   ·   Scroll to zoom
+H  Сон   ·   F5 / F9  Зберегти / Завантажити	H  Rest   ·   F5 / F9  Save / Load
+Рівень	Level
+досв.	XP
+Невивчений рецепт	Unlearned recipe
+У цій категорії ще немає відкритих рецептів	No recipes discovered in this category
+Знаходь матеріали, щоб відкривати рецепти	Find materials to discover recipes
+Вивчи знайдений предмет через Shift + ЛКМ	Study a found item with Shift + LMB
+Shift + ЛКМ · Вивчити	Shift + LMB · Study
+Відновлено спогад про захист розуму.	Mind-protection memory restored.
+Невідомі матеріали	Undiscovered materials
+Продовжити гру	Resume game
+Вийти на головний екран	Exit to main menu
+Вийти до вибору персонажа	Exit to character selection
+Зберегти перед виходом?	Save before leaving?
+Зберегти й вийти	Save and exit
+Вийти без збереження	Exit without saving

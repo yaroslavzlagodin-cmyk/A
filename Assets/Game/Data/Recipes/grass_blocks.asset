@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5948ee1d214b9940a25c18966911550, type: 3}
+  m_Name: grass_blocks
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Crafting.RecipeData
+  id: grass_blocks
+  category: 1
+  ingredients:
+  - item: {fileID: 11400000, guid: 055ffb200b64a8d4ba7494fa5fa47c2c, type: 2}
+    count: 4
+  output: {fileID: 11400000, guid: 3a71c267f2dbfab479df3f16718e7a61, type: 2}
+  outputCount: 4

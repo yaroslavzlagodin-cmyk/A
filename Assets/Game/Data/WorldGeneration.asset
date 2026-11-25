@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5cf8dd335dbdf574495f63debee5da12, type: 3}
+  m_Name: WorldGeneration
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.World.WorldGenerationData
+  grass: {fileID: 11400000, guid: ccc9d60bb9ed7e24a9af357dd825c640, type: 2}
+  dirt: {fileID: 11400000, guid: 9e690aaf02736fd4499c789a709e300a, type: 2}
+  stone: {fileID: 11400000, guid: 481c3187bfa907643b0b060b0d3d4dab, type: 2}
+  wood: {fileID: 11400000, guid: 327614383d0a0dc43bbc35cae95fc53a, type: 2}
+  leaves: {fileID: 11400000, guid: 9698c928a23e0ca459873f68e96343b4, type: 2}
+  ruin: {fileID: 11400000, guid: 2571bf02446000b4b8e0ac78bcd28b38, type: 2}
+  ores:
+  - block: {fileID: 11400000, guid: 065b0ff1a343f7e4286012597e89da63, type: 2}
+    minimumDepth: 18
+    threshold: 0.69
+  - block: {fileID: 11400000, guid: cffa0a66986a4ea4fa6dd6539ad5d7db, type: 2}
+    minimumDepth: 12
+    threshold: 0.68
+  - block: {fileID: 11400000, guid: cb22c2fc09e1b594dbd97a6e4c8c978e, type: 2}
+    minimumDepth: 5
+    threshold: 0.67
+  chunkSize: 16
+  viewRadius: 2
+  version: 4
+  mountains: 1
+  mountainHeight: 28
+  terrainScale: 1
+  biomeScale: 1
+  resourceMultiplier: 1
+  biomeLayout: 0

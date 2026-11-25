@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d432f7220b293d24e85b919e57bcf97f, type: 3}
+  m_Name: ForestShade
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Combat.EnemyData
+  biome: forest
+  underground: 0
+  speed: 2
+  health: 30
+  damage: 8
+  sprite: {fileID: -7841129473042487007, guid: 590b90084bb414746b22647657a2e53b, type: 3}
+  drop: {fileID: 11400000, guid: 4126b96d91b7db947b667a3369f8b11f, type: 2}

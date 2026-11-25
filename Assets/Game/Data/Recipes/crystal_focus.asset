@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5948ee1d214b9940a25c18966911550, type: 3}
+  m_Name: crystal_focus
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Crafting.RecipeData
+  id: crystal_focus
+  category: 2
+  ingredients:
+  - item: {fileID: 11400000, guid: dbb6dd920a6abe349a5b420051dd37b6, type: 2}
+    count: 2
+  - item: {fileID: 11400000, guid: a62887d086ff0ec41aea5aae94a12868, type: 2}
+    count: 4
+  output: {fileID: 11400000, guid: 805fbfb3f6da83a4aa48253cbf1ddb20, type: 2}
+  outputCount: 1

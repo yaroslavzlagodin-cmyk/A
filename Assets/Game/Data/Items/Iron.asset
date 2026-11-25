@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f26db9c0f7525d4cb2aaaf5fc3ed58d, type: 3}
+  m_Name: Iron
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Inventory.ItemData
+  id: iron
+  displayName: Iron
+  icon: {fileID: 21300000, guid: 2a356e2c551e1df46bc068314f41d4e1, type: 3}
+  maxStack: 99
+  category: 0
+  placeableBlock: {fileID: 11400000, guid: cffa0a66986a4ea4fa6dd6539ad5d7db, type: 2}
+  miningPower: 1
+  device: {fileID: 0}
+  smeltsTo: {fileID: 11400000, guid: 1d6331268927e9c9e1164ae03d6a2d6c, type: 2}

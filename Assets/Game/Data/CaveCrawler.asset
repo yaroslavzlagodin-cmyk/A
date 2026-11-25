@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d432f7220b293d24e85b919e57bcf97f, type: 3}
+  m_Name: CaveCrawler
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Combat.EnemyData
+  biome: forest
+  underground: 1
+  speed: 1.6
+  health: 30
+  damage: 10
+  sprite: {fileID: 3900359007270480725, guid: dee3fc2124068ad45a38b0b7f2a281ee, type: 3}
+  drop: {fileID: 11400000, guid: f583f2a52a7c595763f7a1288f284e6a, type: 2}

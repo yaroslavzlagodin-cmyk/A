@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5948ee1d214b9940a25c18966911550, type: 3}
+  m_Name: trail_backpack
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Crafting.RecipeData
+  id: trail_backpack
+  category: 5
+  ingredients:
+  - item: {fileID: 11400000, guid: 4126b96d91b7db947b667a3369f8b11f, type: 2}
+    count: 6
+  - item: {fileID: 11400000, guid: b654a7d7cf9bf144091716bd53188997, type: 2}
+    count: 4
+  output: {fileID: 11400000, guid: 51337c375fcf41918398fe4bd8baa334, type: 2}
+  outputCount: 1
