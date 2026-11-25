@@ -50,15 +50,19 @@ namespace BrokenHeart.Inventory
                 for (int i = 0; i < HotbarSize && i < Keys.Length; i++)
                     if (keyboard[Keys[i]].wasPressedThisFrame) Select(i);
             }
-            if (!IsOpen && !IsMapOpen && HotbarSize > 0 && Mouse.current is Mouse mouse)
+            if (IsOpen || IsMapOpen || Mouse.current is not Mouse mouse) return;
+            float wheel = mouse.scroll.ReadValue().y;
+            if (wheel == 0) return;
+
+            if (keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed))
             {
-                float wheel = mouse.scroll.ReadValue().y;
-                if (wheel != 0)
-                {
-                    int direction = wheel > 0 ? -1 : 1;
-                    Select((SelectedIndex + direction + HotbarSize) % HotbarSize);
-                }
+                var view = Camera.main;
+                if (view != null && view.TryGetComponent<CameraFollow>(out var follow)) follow.StepZoom(wheel);
+                return;
             }
+            if (HotbarSize == 0) return;
+            int direction = wheel > 0 ? -1 : 1;
+            Select((SelectedIndex + direction + HotbarSize) % HotbarSize);
         }
         public void SetOpen(bool open)
         {

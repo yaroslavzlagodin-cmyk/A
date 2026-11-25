@@ -35,6 +35,9 @@ namespace BrokenHeart.Editor
         private static int ledgeX;
         private const int LedgeWidth = 3;
         private static int expectedAutoPickup;
+        private static int wheelSteps, controlSlot;
+        private static float normalCameraSize;
+        private static Vector2Int firstHeldCell, secondHeldCell;
         private static bool running;
 
         static PrototypeChecks()
@@ -283,15 +286,110 @@ namespace BrokenHeart.Editor
                 step = 8;
                 nextStep = Time.time + 1.3f;
             }
-            else
+            else if (step == 8)
             {
                 var world = Object.FindAnyObjectByType<BlockWorld>();
                 Check(world.DepthAt(world.CellAt(player.transform.position)) >= 18 &&
                     Object.FindAnyObjectByType<WorldWeather>().RainRate == 0,
                     "A deep cave shelters the player from storm particles.");
                 CapturePreview("Logs/CavePreview.png");
-                Finish();
+                step = 9;
+                nextStep = Time.time + 0.2f;
             }
+            else CheckWorldControls();
+        }
+
+        private static void CheckWorldControls()
+        {
+            var inventory = player.GetComponent<PlayerInventory>();
+            var world = Object.FindAnyObjectByType<BlockWorld>();
+            var camera = Camera.main;
+            var follow = camera.GetComponent<CameraFollow>();
+            var dirt = inventory.Catalog.Find("dirt");
+            nextStep = Time.time + 0.05f;
+            switch (step)
+            {
+                case 9:
+                    normalCameraSize = camera.orthographicSize;
+                    controlSlot = inventory.SelectedIndex;
+                    wheelSteps = 0;
+                    InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.LeftCtrl));
+                    break;
+                case 10:
+                    if (QueueWheel(Vector2.up, 10)) return;
+                    Check(Mathf.Approximately(follow.Zoom, 2) &&
+                        Mathf.Abs(camera.orthographicSize / normalCameraSize - 0.5f) < 0.02f,
+                        "Ctrl and wheel up zoom the rendered camera to at most 2x.");
+                    wheelSteps = 0;
+                    InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.RightCtrl));
+                    break;
+                case 11:
+                    if (QueueWheel(Vector2.down, 14)) return;
+                    Check(Mathf.Approximately(follow.Zoom, 0.5f) &&
+                        Mathf.Abs(camera.orthographicSize / normalCameraSize - 2f) < 0.02f,
+                        "Ctrl and wheel down zoom the rendered camera to at least 0.5x.");
+                    Check(inventory.SelectedIndex == controlSlot, "Ctrl and wheel keep the selected hotbar slot.");
+                    wheelSteps = 0;
+                    break;
+                case 12:
+                    if (QueueWheel(Vector2.up, 4)) return;
+                    Check(Mathf.Approximately(follow.Zoom, 1), "Camera zoom returns to its default scale.");
+                    InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+                    var slots = new ItemStack[inventory.Model.Capacity];
+                    slots[0] = new ItemStack(dirt, 2);
+                    inventory.Model.Restore(slots);
+                    inventory.Select(0);
+                    var spawn = new Vector2Int(0, world.Generator.Surface(0) + 1);
+                    var body = player.GetComponent<Rigidbody2D>();
+                    body.position = world.Center(spawn) + Vector3.up * 0.3f;
+                    body.linearVelocity = Vector2.zero;
+                    firstHeldCell = spawn + new Vector2Int(-2, 2);
+                    secondHeldCell = spawn + new Vector2Int(2, 2);
+                    world.Set(firstHeldCell, null);
+                    world.Set(secondHeldCell, null);
+                    if (!Application.isFocused &&
+                        typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView") is Type gameView)
+                        EditorWindow.GetWindow(gameView).Focus();
+                    nextStep = Time.time + 0.8f; // Give the camera time to follow the teleport.
+                    break;
+                case 13:
+                    Check(Application.isFocused, "Game view has focus for held mouse input.");
+                    QueueMouseAt(world, firstHeldCell, MouseButton.Right);
+                    break;
+                case 14:
+                    Check(world.Get(firstHeldCell) == dirt.PlaceableBlock, "Right mouse places the first block.");
+                    QueueMouseAt(world, secondHeldCell, MouseButton.Right);
+                    break;
+                case 15:
+                    Check(world.Get(secondHeldCell) == dirt.PlaceableBlock && inventory.Selected.Empty,
+                        "Holding right mouse places a second block under the cursor.");
+                    QueueMouseAt(world, firstHeldCell, MouseButton.Left);
+                    nextStep = Time.time + 0.7f;
+                    break;
+                case 16:
+                    Check(world.Get(firstHeldCell) == null, "Holding left mouse mines the first block.");
+                    QueueMouseAt(world, secondHeldCell, MouseButton.Left);
+                    nextStep = Time.time + 0.7f;
+                    break;
+                case 17:
+                    Check(world.Get(secondHeldCell) == null, "Holding left mouse mines the next block under the cursor.");
+                    Finish();
+                    return;
+            }
+            step++;
+        }
+
+        private static bool QueueWheel(Vector2 direction, int count)
+        {
+            if (wheelSteps++ >= count) return false;
+            InputSystem.QueueDeltaStateEvent(mouse.scroll, direction);
+            return true;
+        }
+
+        private static void QueueMouseAt(BlockWorld world, Vector2Int cell, MouseButton button)
+        {
+            var state = new MouseState { position = Camera.main.WorldToScreenPoint(world.Center(cell)) };
+            InputSystem.QueueStateEvent(mouse, state.WithButton(button));
         }
 
         private static void CheckQuickPlayerTransfer(PlayerInventory inventory)

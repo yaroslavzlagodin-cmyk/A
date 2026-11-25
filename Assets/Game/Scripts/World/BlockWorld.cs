@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BrokenHeart.Inventory;
+using BrokenHeart.Player;
 using BrokenHeart.Systems;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -18,11 +19,14 @@ namespace BrokenHeart.World
         [SerializeField] private bool terrainShadowsEnabled = false;
         private readonly HashSet<Vector2Int> visible = new();
         private Vector2Int lastChunk = new(int.MinValue, int.MinValue);
+        private RectInt lastCameraChunks;
         private readonly Dictionary<string, BlockData> definitions = new();
         private readonly HashSet<Vector2Int> explored = new();
         private Tilemap background;
         private DayNightSystem clock;
         private PlayerInventory inventory;
+        private Camera view;
+        private CameraFollow cameraFollow;
         private Vector2Int lastSurveyOrigin;
         private int lastSurveyRadius;
         private bool surveyDirty = true;
@@ -53,6 +57,8 @@ namespace BrokenHeart.World
                     throw new System.InvalidOperationException("Block IDs must be unique and tiles assigned.");
             }
             clock = GetComponent<DayNightSystem>();
+            view = Camera.main;
+            if (view != null) cameraFollow = view.GetComponent<CameraFollow>();
             if (observer != null) inventory = observer.GetComponent<PlayerInventory>();
             var walls = new GameObject("Background Walls", typeof(Tilemap), typeof(TilemapRenderer));
             walls.transform.SetParent(tilemap.transform, false);
@@ -86,9 +92,10 @@ namespace BrokenHeart.World
         private void Update()
         {
             if (Generator == null || observer == null) return;
-            RefreshVisible(false);
             Survey();
         }
+
+        private void LateUpdate() => RefreshVisible(false);
 
         private void Survey()
         {
@@ -159,13 +166,16 @@ namespace BrokenHeart.World
         {
             if (!(Store is ChunkBlockStore chunks) || observer == null) return;
             var center = chunks.ChunkAt(CellAt(observer.position));
-            if (!force && center == lastChunk) return;
+            var cameraChunks = GetZoomedOutCameraChunks(chunks);
+            if (!force && center == lastChunk && cameraChunks.Equals(lastCameraChunks)) return;
             lastChunk = center;
+            lastCameraChunks = cameraChunks;
             var wanted = new HashSet<Vector2Int>();
             int size = generation.chunkSize;
             var empty = new TileBase[size * size];
             for (int y = -generation.viewRadius; y <= generation.viewRadius; y++)
                 for (int x = -generation.viewRadius; x <= generation.viewRadius; x++) wanted.Add(center + new Vector2Int(x, y));
+            foreach (var chunk in cameraChunks.allPositionsWithin) wanted.Add(chunk);
             foreach (var chunk in visible)
                 if (!wanted.Contains(chunk))
                 {
@@ -202,6 +212,22 @@ namespace BrokenHeart.World
                 background.SetTiles(walls, true);
             }
             visible.Clear(); foreach (var chunk in wanted) visible.Add(chunk);
+        }
+
+        private RectInt GetZoomedOutCameraChunks(ChunkBlockStore chunks)
+        {
+            if (view == null || cameraFollow == null || cameraFollow.Zoom >= 1f) return default;
+            float halfHeight = view.orthographicSize;
+            var halfSize = new Vector3(halfHeight * view.aspect, halfHeight);
+            var position = view.transform.position;
+            // Include the tiles along the viewport edge when the camera snaps to the pixel grid.
+            var min = Vector2Int.Max(CellAt(position - halfSize) - Vector2Int.one, bounds.min);
+            var max = Vector2Int.Min(CellAt(position + halfSize) + Vector2Int.one, bounds.max - Vector2Int.one);
+            if (min.x > max.x || min.y > max.y) return default;
+
+            var first = chunks.ChunkAt(min);
+            var last = chunks.ChunkAt(max);
+            return new RectInt(first, last - first + Vector2Int.one);
         }
 
         private static Matrix4x4 TileTransform(TileBase tile) => tile is Tile simple ? simple.transform : Matrix4x4.identity;

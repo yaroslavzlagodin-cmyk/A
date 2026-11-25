@@ -357,13 +357,12 @@ namespace BrokenHeart.UI
                 DrawSlot(rect, new SlotTarget(i));
                 Label(At(rect, 3, 2, 13, 12), (i + 1).ToString(), 10, i == inventory.SelectedIndex ? Gold : Soft);
                 if (i == inventory.SelectedIndex)
-                {
-                    float progress = interaction != null ? interaction.Progress : 0;
-                    Meter(At(rect, 1, rect.height + 1, rect.width - 2, 4), progress > 0 ? progress : 1, progress > 0 ? Mint : Gold);
-                }
+                    Meter(At(rect, 1, rect.height + 1, rect.width - 2, 4), 1, Gold);
             }
             if (inventory.IsOpen) return;
             var label = new Rect(bar.center.x - 115, bar.y - 21, 230, 20);
+            if (interaction != null && interaction.Progress > 0)
+                Meter(At(label, 0, -10, label.width, 6), interaction.Progress, Mint);
             if (interaction != null && interaction.TargetStation is Workstation target)
             {
                 Label(label, $"{L(target.Item.DisplayName)}   ·   {L("RMB to open")}", 12, Gold, TextAnchor.MiddleCenter);

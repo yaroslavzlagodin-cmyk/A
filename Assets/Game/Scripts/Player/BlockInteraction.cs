@@ -80,9 +80,16 @@ namespace BrokenHeart.Player
             outline.startColor = outline.endColor = InReach ? new Color(1f, 0.86f, 0.42f) : new Color(1f, 0.3f, 0.3f);
             var keyboard = Keyboard.current;
             bool control = keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
-            if (mouse.leftButton.isPressed) Mine(cell, Time.deltaTime, control);
-            else ResetMining();
-            if (mouse.rightButton.wasPressedThisFrame && TryPlace(cell)) stations?.HidePreview();
+            if (mouse.leftButton.isPressed)
+            {
+                Mine(cell, Time.deltaTime, control);
+                return;
+            }
+            ResetMining();
+            bool placingBlock = selected != null && selected.PlaceableBlock != null &&
+                selected.Station == StationKind.None && selected.Device == null;
+            if ((mouse.rightButton.wasPressedThisFrame || (placingBlock && mouse.rightButton.isPressed)) && TryPlace(cell))
+                stations?.HidePreview();
         }
 
         public bool IsInReach(Vector2Int cell) => world.Store.Contains(cell) &&
