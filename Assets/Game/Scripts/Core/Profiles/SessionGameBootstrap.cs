@@ -18,7 +18,7 @@ namespace BrokenHeart.Core.Profiles
         [SerializeField] private PlayerInventory player;
         [SerializeField] private HeroData[] heroes;
         private WorldGenerationData settings;
-        private bool paused,loadFailed;
+        private bool paused,loadFailed,deathSavePending;
         private bool savedWhilePaused;
         private DisplaySettingsDraft pauseSettings;
         private readonly PauseBackdrop backdrop = new();
@@ -52,7 +52,7 @@ namespace BrokenHeart.Core.Profiles
             if (keys == null || !keys.escapeKey.wasPressedThisFrame) return;
             if (pauseSettings != null) pauseSettings = null;
             else if (exit != ExitDestination.None) exit = ExitDestination.None;
-            else if (!player.IsOpen && !player.IsMapOpen && !loadFailed) SetPaused(!paused);
+            else if (!player.IsOpen && !player.IsMapOpen && !loadFailed && !deathSavePending) SetPaused(!paused);
         }
         public void SetPaused(bool value)
         {
@@ -95,7 +95,7 @@ namespace BrokenHeart.Core.Profiles
         private void RequestExit(ExitDestination destination)
         {
             if (savedWhilePaused || loadFailed) ReturnToMenu(false, destination == ExitDestination.Characters);
-            else exit = destination;
+            else if (!ReturnToMenu(true, destination == ExitDestination.Characters)) exit = destination;
         }
         private void SaveWhilePaused()
         {
@@ -159,7 +159,12 @@ namespace BrokenHeart.Core.Profiles
                 }
                 player.RestoreLoadout(new ItemStack[player.BaseCapacity], new ItemStack[PlayerInventory.EquipmentCount]);
             }
-            if(permanent){SessionContext.Character.dead=true;world.GetComponent<SaveSystem>().Save();ReturnToMenu(false);}
+            if (permanent)
+            {
+                SessionContext.Character.dead = true;
+                deathSavePending = true;
+                RequestExit(ExitDestination.Lobby);
+            }
         }
         private void OnGUI()
         {
@@ -180,7 +185,7 @@ namespace BrokenHeart.Core.Profiles
             if (loadFailed)
                 HudSkin.Label(new Rect(360, 149, 560, 34), Localization.T("НЕ ВДАЛОСЯ ЗАВАНТАЖИТИ"), 21,
                     MenuSkin.Text, TextAnchor.MiddleCenter, true);
-            if (!loadFailed && MenuSkin.PauseButton(new Rect(420, 204, 440, 50), "Продовжити гру", true)) SetPaused(false);
+            if (!loadFailed && !deathSavePending && MenuSkin.PauseButton(new Rect(420, 204, 440, 50), "Продовжити гру", true)) SetPaused(false);
             if (MenuSkin.PauseButton(new Rect(420, 269, 440, 50), "Налаштування")) OpenPauseSettings();
             if (!loadFailed && MenuSkin.PauseButton(new Rect(420, 334, 440, 50), "Зберегти")) SaveWhilePaused();
             if (MenuSkin.PauseButton(new Rect(420, 399, 440, 50), "Вийти на головний екран")) RequestExit(ExitDestination.Lobby);
@@ -206,7 +211,7 @@ namespace BrokenHeart.Core.Profiles
                 MenuSkin.Text, TextAnchor.MiddleCenter, true);
             bool chooseCharacter = exit == ExitDestination.Characters;
             if (MenuSkin.PauseButton(new Rect(420, 275, 440, 50), "Зберегти й вийти", true)) ReturnToMenu(true, chooseCharacter);
-            if (MenuSkin.PauseButton(new Rect(420, 340, 440, 50), "Вийти без збереження")) ReturnToMenu(false, chooseCharacter);
+            if (!deathSavePending && MenuSkin.PauseButton(new Rect(420, 340, 440, 50), "Вийти без збереження")) ReturnToMenu(false, chooseCharacter);
             if (MenuSkin.PauseButton(new Rect(420, 405, 440, 50), "Скасувати")) exit = ExitDestination.None;
             DrawStatus(475);
         }

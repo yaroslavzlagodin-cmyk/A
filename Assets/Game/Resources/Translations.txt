@@ -194,6 +194,7 @@ F5 зберегти / F9 завантажити	F5 save / F9 load
 Кристалічний фокус захищає розум, коли вибраний.	Crystal Focus protects the mind when held.
 Світ, речі та спогади збережено	Saved world, backpack and memories
 Збереження завантажено	Save loaded
+Відновлено попереднє повне збереження	Loaded previous complete save
 Не вдалося зберегти: 	Save failed: 
 Не вдалося завантажити: 	Load failed: 
 H: сон 8с / F8: глузд -20 (тест)	H: rest 8s / F8: sanity -20 (debug)

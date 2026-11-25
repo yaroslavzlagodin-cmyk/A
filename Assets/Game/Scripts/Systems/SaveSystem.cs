@@ -39,18 +39,51 @@ namespace BrokenHeart.Systems
         public WeatherKind weather;
         public float sanity = 100, awakeSeconds;
         public bool collapsed;
+        internal SaveData Copy() => (SaveData)MemberwiseClone();
     }
     public sealed class SaveSystem : MonoBehaviour
     {
+        private const float AutosaveInterval = 120f;
         [SerializeField] private BlockWorld world;
         [SerializeField] private PlayerInventory inventory;
         [SerializeField] private MemorySystem memory;
+        private SleepSystem sleep;
+        private SaveData startingState;
+        private bool sessionReady, writing;
+        private float activeSeconds;
         public string Status { get; private set; } = "F5 save / F9 load";
-        // In the Editor this stays inside the project, per the project file policy.
-        public string SavePath => SessionContext.Active ? ProfileLibrary.WorldPath(SessionContext.World.id) : Path.Combine(Path.GetDirectoryName(Application.dataPath), "Saves", "world.json");
+        private static string SandboxPath => Path.Combine(ProfileLibrary.Root, "world.json");
+
+        private void OnEnable()
+        {
+            sleep = inventory != null ? inventory.GetComponent<SleepSystem>() : null;
+            if (sleep != null) sleep.RestCompleted += SaveAfterRest;
+        }
+
+        private void OnDisable()
+        {
+            if (sleep != null) sleep.RestCompleted -= SaveAfterRest;
+        }
+
+        private void SaveAfterRest()
+        {
+            if (SessionContext.Active && sessionReady) Save();
+        }
+
         private void Update()
         {
             if (Time.timeScale == 0) return;
+            if (SessionContext.Active && sessionReady)
+            {
+                // Count play time only. A transient failure retries at the next save event.
+                activeSeconds += Time.deltaTime;
+                if (activeSeconds >= AutosaveInterval)
+                {
+                    activeSeconds = 0;
+                    Save();
+                    return;
+                }
+            }
             var keyboard = Keyboard.current;
             if (keyboard == null) return;
             if (keyboard.f5Key.wasPressedThisFrame) Save();
@@ -85,27 +118,73 @@ namespace BrokenHeart.Systems
         };
         public bool Save()
         {
+            if (writing || SessionContext.Active && !sessionReady) return false;
+            writing = true;
             try
             {
-                if(!world.Bounds.Contains(world.CellAt(inventory.transform.position))) throw new InvalidDataException("Return inside the world before saving.");
-                if(SessionContext.Active)SessionContext.Save(Capture());else SaveFileStore.WriteAtomic(SavePath,JsonUtility.ToJson(Capture(),true));
-                Status = "Saved world, backpack and memories"; return true;
+                var data = Capture();
+                ValidateSave(data);
+                if (SessionContext.Active) SessionContext.Save(data);
+                else SaveFileStore.WriteAtomic(SandboxPath, JsonUtility.ToJson(data, true));
+                activeSeconds = 0;
+                Status = "Saved world, backpack and memories";
+                return true;
             }
             catch (Exception error) { Status = "Save failed: " + error.Message; return false; }
+            finally { writing = false; }
         }
+
         public bool Load()
         {
-            try { Restore(SessionContext.Active ? SessionContext.Load(Capture()) : JsonUtility.FromJson<SaveData>(SaveFileStore.Read(SavePath))); Status = "Save loaded"; return true; }
+            try
+            {
+                bool recovered = false;
+                if (SessionContext.Active)
+                {
+                    PreparedSave prepared = default;
+                    startingState ??= Capture();
+                    var data = SessionContext.Load(startingState, candidate => prepared = ValidateSave(candidate), out recovered);
+                    ApplySave(data, prepared);
+                    sessionReady = true;
+                }
+                else
+                {
+                    Restore(JsonUtility.FromJson<SaveData>(SaveFileStore.Read(SandboxPath)));
+                }
+                activeSeconds = 0;
+                Status = recovered ? "Loaded previous complete save" : "Save loaded";
+                return true;
+            }
             catch (Exception error) { Status = "Load failed: " + error.Message; return false; }
         }
         public void Restore(SaveData data)
+        {
+            ApplySave(data, ValidateSave(data));
+        }
+
+        private readonly struct PreparedSave
+        {
+            public readonly ItemStack[] Slots, Equipped;
+            public readonly List<(SavedWorkstation Saved, ItemData Item, ItemStack[] Contents)> Stations;
+
+            public PreparedSave(ItemStack[] slots, ItemStack[] equipped,
+                List<(SavedWorkstation Saved, ItemData Item, ItemStack[] Contents)> stations)
+            {
+                Slots = slots;
+                Equipped = equipped;
+                Stations = stations;
+            }
+        }
+
+        private PreparedSave ValidateSave(SaveData data)
         {
             // Validate the complete payload before changing any live state.
             if (data == null || data.version != 1 ||
                 (data.generatorVersion < WorldGenerationData.LegacyVersion || data.generatorVersion > WorldGenerationData.CurrentVersion) ||
                 data.slots == null || data.blocks == null || data.memories == null || data.drops == null ||
                 data.selected < 0 || data.selected >= inventory.HotbarSize || data.experience < 0 ||
-                !float.IsFinite(data.position.x) || !float.IsFinite(data.position.y) || !world.Bounds.Contains(world.CellAt(data.position)))
+                !float.IsFinite(data.position.x) || !float.IsFinite(data.position.y) || !float.IsFinite(data.position.z) ||
+                !world.Bounds.Contains(world.CellAt(data.position)))
                 throw new InvalidDataException("Invalid or incompatible world save.");
             var equipped = new ItemStack[PlayerInventory.EquipmentCount];
             if (data.equipment != null && data.equipment.Length != 0)
@@ -148,9 +227,14 @@ namespace BrokenHeart.Systems
                     !world.Bounds.Contains(world.CellAt(device.position)) || !deviceCells.Add(world.CellAt(device.position)) || deviceCells.Count > 64)
                     throw new InvalidDataException("Invalid energy device.");
             }
+            return new PreparedSave(slots, equipped, ValidateStations(data, world.GetComponent<WorkstationSystem>(), deviceCells));
+        }
+
+        private void ApplySave(SaveData data, PreparedSave prepared)
+        {
             var stations = world.GetComponent<WorkstationSystem>();
-            var stationStates = ValidateStations(data, stations, deviceCells);
-            inventory.RestoreLoadout(slots, equipped);
+            var network = world.GetComponent<EnergyNetwork>();
+            inventory.RestoreLoadout(prepared.Slots, prepared.Equipped);
             memory.Restore(data.memories, data.studyItems, data.knownMaterials);
             inventory.Progress.Restore(data.experience);
             inventory.Select(data.selected);
@@ -176,7 +260,7 @@ namespace BrokenHeart.Systems
                 network.Clear();
                 foreach (var device in data.devices ?? Array.Empty<SavedDevice>()) network.Spawn(inventory.Catalog.Find(device.itemId), device.position, device.stored);
             }
-            foreach (var (saved, item, contents) in stationStates)
+            foreach (var (saved, item, contents) in prepared.Stations)
                 stations.Spawn(item, saved.cell, saved.fullSizeFurnace).Restore(contents, saved.burn, saved.smelt);
         }
 
@@ -201,9 +285,8 @@ namespace BrokenHeart.Systems
                 foreach (var offset in Workstation.Footprint(saved.fullSizeFurnace))
                 {
                     var cell = saved.cell + offset;
-                    var below = cell + Vector2Int.down;
-                    if (!world.Bounds.Contains(cell) || !occupied.Add(cell) || !string.IsNullOrEmpty(BlockAt(cell)) ||
-                        (offset.y == 0 && (!world.Bounds.Contains(below) || !world.IsSolidId(BlockAt(below)))))
+                    // Placement needs support. An existing station may have been dug out from below.
+                    if (!world.Bounds.Contains(cell) || !occupied.Add(cell) || !string.IsNullOrEmpty(BlockAt(cell)))
                         throw new InvalidDataException("Invalid workstation placement.");
                 }
                 int capacity = Workstation.CapacityFor(item.Station);

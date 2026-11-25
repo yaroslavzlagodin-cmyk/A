@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using BrokenHeart.Core.Profiles;
 using BrokenHeart.World;
@@ -16,6 +15,7 @@ namespace BrokenHeart.UI
         private LibraryData library;
         private WorldGenerationData previewSettings;
         private string page="main",status="",search="",selectedHero,editingId;
+        private bool worldGenerationLocked;
         private string confirmText;
         private Action confirmed;
         private bool storageBlocked;
@@ -201,14 +201,29 @@ namespace BrokenHeart.UI
             GUI.EndScrollView();
         }
         private void EditWorld(WorldProfile profile)
-        {editingId=profile?.id;worldDraft=profile==null?new WorldProfile{seed=UnityEngine.Random.Range(1,int.MaxValue).ToString()}:JsonUtility.FromJson<WorldProfile>(JsonUtility.ToJson(profile));Navigate("world_editor");}
+        {
+            try
+            {
+                worldGenerationLocked = profile != null && ProfileLibrary.HasSavedWorld(profile.id);
+            }
+            catch (Exception error)
+            {
+                status = "Не вдалося завантажити: " + error.Message;
+                return;
+            }
+            editingId = profile?.id;
+            worldDraft = profile == null
+                ? new WorldProfile { seed = UnityEngine.Random.Range(1, int.MaxValue).ToString() }
+                : JsonUtility.FromJson<WorldProfile>(JsonUtility.ToJson(profile));
+            Navigate("world_editor");
+        }
         private void WorldEditor()
         {
             Heading(editingId==null?"СТВОРЕННЯ СВІТУ":"НАЛАШТУВАННЯ СВІТУ");
             if(MenuSkin.Button(new Rect(70,96,240,44),"До бібліотеки"))Navigate("worlds");
             if(MenuSkin.Button(new Rect(770,96,210,44),"Зберегти",true))SaveWorld(false);
             if(MenuSkin.Button(new Rect(995,96,215,44),"Зберегти й грати"))SaveWorld(true);
-            bool locked=editingId!=null && File.Exists(ProfileLibrary.WorldPath(editingId));
+            bool locked = worldGenerationLocked;
             MenuSkin.Label(new Rect(75,170,245,30),"РЕЛЬЄФ І БІОМИ",21,MenuSkin.Cyan);DrawPreview(new Rect(75,210,245,145),worldDraft);
             MenuSkin.Label(new Rect(75,375,245,30),"Розмір світу",19,MenuSkin.Cyan);
             GUI.enabled=!locked && confirmed==null;
@@ -250,7 +265,7 @@ namespace BrokenHeart.UI
         public void Launch(WorldProfile world,CharacterProfile character)
         {
             if(character==null || character.dead){status="Спочатку обери живого героя.";return;}
-            library.lastWorld=world.id;library.lastCharacter=character.id;if(!Persist())return;
+            // The selected journey is recorded by the next successful world save.
             SessionContext.Begin(world,character);page="loading";loading=SceneManager.LoadSceneAsync("Game");
         }
         private void Settings()

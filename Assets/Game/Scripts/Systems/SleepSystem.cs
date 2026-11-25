@@ -15,7 +15,8 @@ namespace BrokenHeart.Systems
         [SerializeField] private MemorySystem memory;
         [SerializeField] private ItemData mindFocus;
         public bool Resting { get; private set; }
-        public string Status { get; private set; } = "H: rest 8s / F8: sanity -20 (debug)";
+        public string Status { get; private set; } = "";
+        public event System.Action RestCompleted;
         private float restSeconds;
         private void OnEnable(){vitals.Damaged+=OnDamaged; sanity.FirstCollapse+=OnCollapse;}
         private void OnDisable(){vitals.Damaged-=OnDamaged; sanity.FirstCollapse-=OnCollapse; CancelRest();}
@@ -34,7 +35,7 @@ namespace BrokenHeart.Systems
             if(keyboard!=null)
             {
                 if(keyboard.hKey.wasPressedThisFrame) { if(Resting)CancelRest(); else TryRest(); }
-                if(keyboard.f8Key.wasPressedThisFrame)sanity.Adjust(-20);
+                if(Debug.isDebugBuild && keyboard.f8Key.wasPressedThisFrame)sanity.Adjust(-20);
                 if(Resting && (keyboard.aKey.isPressed || keyboard.dKey.isPressed || keyboard.leftArrowKey.isPressed || keyboard.rightArrowKey.isPressed || keyboard.spaceKey.isPressed))CancelRest();
             }
             if(Resting && (!motor.Grounded || enemies.Nearby(8))) { CancelRest(); Status="Sleep interrupted"; }
@@ -42,7 +43,13 @@ namespace BrokenHeart.Systems
             if(Resting)
             {
                 restSeconds+=Time.deltaTime; vitals.Heal(Time.deltaTime*2);
-                if(restSeconds>=8){CancelRest();sanity.RestCompleted();Status="Rested. H to rest again";}
+                if (restSeconds >= 8)
+                {
+                    CancelRest();
+                    sanity.RestCompleted();
+                    Status = "Rested. H to rest again";
+                    RestCompleted?.Invoke();
+                }
             }
         }
     }
