@@ -1,4 +1,5 @@
 using BrokenHeart.World;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,6 +9,7 @@ namespace BrokenHeart.Systems
 
     public sealed class WorldWeather : MonoBehaviour
     {
+        private static readonly ProfilerMarker SimulateWeather = new("Broken Heart.Weather");
         [SerializeField] private Transform observer;
         [SerializeField] private BlockWorld world;
         [SerializeField] private Shader particleShader;
@@ -136,6 +138,7 @@ namespace BrokenHeart.Systems
         private void Update()
         {
             if (Time.timeScale == 0) return;
+            using var measure = SimulateWeather.Auto();
             float dt = Time.deltaTime;
             rain.transform.position = observer.position + Vector3.up * 14;
             fog.transform.position = observer.position + Vector3.up * 2;

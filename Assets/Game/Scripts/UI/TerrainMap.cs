@@ -1,11 +1,13 @@
 using System;
 using BrokenHeart.World;
+using Unity.Profiling;
 using UnityEngine;
 
 namespace BrokenHeart.UI
 {
     internal sealed class TerrainMap : IDisposable
     {
+        private static readonly ProfilerMarker Rasterization = new("Broken Heart.MapRaster");
         private static readonly Color32 Sky = new(27, 45, 61, 255);
         private static readonly Color32 Stone = new(74, 75, 92, 255);
         private static readonly Color32 Soil = new(100, 72, 60, 255);
@@ -47,6 +49,7 @@ namespace BrokenHeart.UI
 
         private void Render(BlockWorld world, RectInt bounds, int width, int height)
         {
+            using var measure = Rasterization.Auto();
             if (texture == null || texture.width != width || texture.height != height)
             {
                 if (texture != null) UnityEngine.Object.Destroy(texture);

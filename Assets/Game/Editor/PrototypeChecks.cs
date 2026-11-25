@@ -38,6 +38,9 @@ namespace BrokenHeart.Editor
         private static int wheelSteps, controlSlot;
         private static float normalCameraSize;
         private static Vector2Int firstHeldCell, secondHeldCell;
+        private static ItemDrop streamedDrop;
+        private static Vector2 dropPosition, originalPlayerPosition;
+        private static Vector2Int streamedFloor;
         private static bool running;
 
         static PrototypeChecks()
@@ -373,6 +376,42 @@ namespace BrokenHeart.Editor
                     break;
                 case 17:
                     Check(world.Get(secondHeldCell) == null, "Holding left mouse mines the next block under the cursor.");
+                    InputSystem.QueueStateEvent(mouse, new MouseState());
+                    var traveller = player.GetComponent<Rigidbody2D>();
+                    originalPlayerPosition = traveller.position;
+                    dropPosition = traveller.position + Vector2.right * 4;
+                    streamedDrop = world.GetComponent<DropSpawner>().Spawn(dirt, 1, dropPosition);
+                    streamedFloor = new Vector2Int(world.Bounds.xMin + 64, world.Bounds.yMax - 10);
+                    var stone = inventory.Catalog.Find("stone").PlaceableBlock;
+                    for (int x = -2; x <= 2; x++)
+                    {
+                        var floor = streamedFloor + new Vector2Int(x, 0);
+                        world.Set(floor, stone);
+                        for (int y = 1; y <= 4; y++) world.Set(floor + new Vector2Int(0, y), null);
+                    }
+                    traveller.position = world.Center(streamedFloor + Vector2Int.up * 2);
+                    traveller.linearVelocity = Vector2.zero;
+                    nextStep = Time.time + 0.8f;
+                    break;
+                case 18:
+                    Check(player.Grounded && Physics2D.OverlapPoint(world.Center(streamedFloor), 1) != null,
+                        "A teleport to distant terrain has ground collision before the hero can fall through.");
+                    var chunks = (ChunkBlockStore)world.Store;
+                    Check(world.VisibleChunks == 25 && chunks.InactiveChunks <= ChunkBlockStore.InactiveChunkLimit &&
+                        chunks.CachedChunks <= world.VisibleChunks + ChunkBlockStore.InactiveChunkLimit,
+                        "Streaming settles on a 5x5 active window within the bounded chunk cache.");
+                    Check(streamedDrop != null && streamedDrop.Count == 1 &&
+                        !streamedDrop.GetComponent<Rigidbody2D>().simulated &&
+                        Vector2.Distance(streamedDrop.transform.position, dropPosition) < 0.05f,
+                        "A drop remains at its position when its terrain unloads.");
+                    var returnBody = player.GetComponent<Rigidbody2D>();
+                    returnBody.position = originalPlayerPosition;
+                    returnBody.linearVelocity = Vector2.zero;
+                    nextStep = Time.time + 0.3f;
+                    break;
+                case 19:
+                    Check(streamedDrop != null && streamedDrop.Count == 1 && streamedDrop.GetComponent<Rigidbody2D>().simulated,
+                        "An uncollected drop resumes simulation when its terrain returns.");
                     Finish();
                     return;
             }
@@ -735,6 +774,7 @@ namespace BrokenHeart.Editor
             }
             Check(Object.FindObjectsByType<AudioSource>().Length==0,"Scene creates no sound sources.");
             Check(first.ChunkAt(new Vector2Int(-1,-17)) == new Vector2Int(-1,-2), "Negative coordinates map to correct chunks.");
+            CheckChunkCache(world.Generation);
             var edited = new Vector2Int(-17,-12); first.Set(edited, "grass"); first.Unload(first.ChunkAt(edited));
             Check(first.Get(edited) == "grass", "Chunk unload preserves edits.");
             var save = world.GetComponent<SaveSystem>();
@@ -759,11 +799,43 @@ namespace BrokenHeart.Editor
                     world.Generator.Generate(new Vector2Int(25, world.Generator.Surface(25) - depth)) != null),
                 "Version 2 saves retain their original solid terrain.");
             save.Restore(JsonUtility.FromJson<SaveData>(json));
+            Check(world.VisibleChunks == 9, "Loading prepares the collision area before the outer chunks.");
+            world.RefreshVisible(true);
             Check(world.VisibleChunks == 25, "Only a bounded 5x5 chunk window is rendered.");
             var bad = JsonUtility.FromJson<SaveData>(json); bad.slots[0].id = "missing_item";
             bool rejected = false;
             try { save.Restore(bad); } catch (InvalidDataException) { rejected = true; }
             Check(rejected && world.Seed == snapshot.seed, "Invalid save is rejected before mutating world.");
+        }
+
+        private static void CheckChunkCache(WorldGenerationData settings)
+        {
+            var bounds = new RectInt(-1024, -256, 2048, 512);
+            var store = new ChunkBlockStore(bounds, 16, new TerrainGenerator(-43147, settings));
+            var reverse = new ChunkBlockStore(bounds, 16, new TerrainGenerator(-43147, settings));
+            var cells = Enumerable.Range(0, 48).Select(i => new Vector2Int(-380 + i * 16, -17)).ToArray();
+            var expected = cells.Select(store.Peek).ToArray();
+            Check(store.CachedChunks == 0 && store.Peek(bounds.max) == null,
+                "Read-only terrain sampling does not allocate chunks or escape the world bounds.");
+            Check(cells.Select(store.Get).SequenceEqual(expected) &&
+                cells.Reverse().Select(reverse.Get).SequenceEqual(expected.Reverse()),
+                "Negative coordinates generate identical terrain with a different chunk read order.");
+            string changed = expected[0] == "grass" ? "stone" : "grass";
+            store.Set(cells[0], changed);
+            foreach (var cell in cells.Skip(1)) store.Get(cell);
+            Check(store.InactiveChunks == ChunkBlockStore.InactiveChunkLimit && store.Get(cells[0]) == changed,
+                "Evicting distant chunks keeps edits and caps inactive terrain at 24 chunks.");
+
+            var touched = cells[24];
+            var untouched = cells[25];
+            store.Get(touched);
+            store.Get(new Vector2Int(480, -17));
+            store.Unload(store.ChunkAt(untouched));
+            Check(store.CachedChunks == ChunkBlockStore.InactiveChunkLimit,
+                "Eviction keeps the recently used chunk and discards the least recently used one.");
+            store.Unload(store.ChunkAt(touched));
+            Check(store.CachedChunks == ChunkBlockStore.InactiveChunkLimit - 1,
+                "The recently reused chunk is still present after eviction.");
         }
 
         private static Vector2Int FindCave(BlockWorld world)
@@ -801,6 +873,56 @@ namespace BrokenHeart.Editor
             save.Restore(JsonUtility.FromJson<SaveData>(JsonUtility.ToJson(snapshot)));
             float restored = 0; foreach (var device in network.Devices) restored += device.Stored;
             Check(network.Devices.Count == 2 && Mathf.Abs(restored-energy) < 0.001f, "Save restores devices and stored energy.");
+            CheckFixedEnergy(network, catalog);
+            save.Restore(snapshot);
+        }
+
+        private static void CheckFixedEnergy(EnergyNetwork network, ItemCatalog catalog)
+        {
+            var generatorItem = catalog.Find("crystal_generator");
+            var lampItem = catalog.Find("crystal_lamp");
+            var origin = new Vector3(0.5f, 4.5f, 0);
+            float ChargeAfterSeconds(int fps)
+            {
+                network.Clear();
+                var source = network.Spawn(generatorItem, origin);
+                var consumer = network.Spawn(lampItem, origin + Vector3.right * 4);
+                for (int frame = 0; frame < 2 * fps; frame++) network.Tick(1f / fps);
+                return consumer.Powered ? source.Stored + consumer.Stored : -1;
+            }
+            float at30 = ChargeAfterSeconds(30), at60 = ChargeAfterSeconds(60), at120 = ChargeAfterSeconds(120);
+            Check(Mathf.Abs(at30 - 4f) < 0.001f && Mathf.Abs(at30 - at60) < 0.0001f &&
+                Mathf.Abs(at30 - at120) < 0.0001f, "Energy charge and power agree at 30, 60, and 120 FPS.");
+
+            var generatorData = generatorItem.Device;
+            var lampData = lampItem.Device;
+            float generation = generatorData.generationPerSecond;
+            float capacity = lampData.capacity;
+            try
+            {
+                network.Clear();
+                generatorData.generationPerSecond = 1.25f;
+                network.Spawn(generatorItem, origin);
+                var distant = network.Spawn(lampItem, origin + Vector3.right * 10);
+                var nearby = network.Spawn(lampItem, origin + Vector3.right * 4);
+                network.Tick(0.1f);
+                Check(nearby.Powered && !distant.Powered, "Connected consumers retain their previous power priority.");
+                network.Remove(nearby, false);
+                network.Tick(0.1f);
+                Check(!distant.Powered, "Removing a device refreshes the energy connections.");
+                network.Clear();
+                lampData.capacity = 0;
+                var empty = network.Spawn(lampItem, origin);
+                network.Tick(0.1f);
+                Check(float.IsFinite(empty.Stored) && empty.Stored == 0 && !empty.Powered,
+                    "A network with no capacity keeps finite zero charge.");
+            }
+            finally
+            {
+                network.Clear();
+                generatorData.generationPerSecond = generation;
+                lampData.capacity = capacity;
+            }
         }
 
         private static void CheckLiving()

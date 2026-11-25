@@ -15,6 +15,8 @@ namespace BrokenHeart.Editor
         [MenuItem("Broken Heart/Build/Windows Release")]
         public static void BuildRelease() => Build("WindowsRelease", BuildOptions.None);
 
+        public static void BuildPerformanceBaseline() => Build("WindowsPerformanceBaseline", BuildOptions.Development);
+
         private static void Build(string folder, BuildOptions options)
         {
             // The standalone starts in the same lobby as Play Mode.
