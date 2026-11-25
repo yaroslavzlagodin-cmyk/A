@@ -14,6 +14,8 @@ namespace BrokenHeart.Combat
         [SerializeField] private DayNightSystem clock;
         [SerializeField] private EnemyData[] types;
         [SerializeField] private Material material;
+        // Keep the enemy data in the project while encounters are paused.
+        [SerializeField] private bool encountersEnabled = false;
         private readonly List<EnemyActor> actors=new();
         private System.Random random;
         private PlayerInventory inventory;
@@ -28,6 +30,7 @@ namespace BrokenHeart.Combat
         public bool Peaceful { get; set; }
         public float DamageMultiplier { get; set; } = 1;
         public float FallBoundary=>world.Bounds.yMin-16;
+        private bool EncountersActive => encountersEnabled && isActiveAndEnabled;
         private void Awake()
         {
             random = new System.Random(world.Seed ^ 8221);
@@ -44,15 +47,16 @@ namespace BrokenHeart.Combat
 
         public bool Eligible(EnemyData data, Vector2 position)
         {
+            if (!EncountersActive || Peaceful) return false;
             var cell = world.CellAt(position);
             int depth = world.DepthAt(cell);
-            return !Peaceful && (data.underground ? depth > 6 :
-                depth <= 1 && clock.IsNight && world.Generator.Biome(cell.x) == data.biome);
+            return data.underground ? depth > 6 :
+                depth <= 1 && clock.IsNight && world.Generator.Biome(cell.x) == data.biome;
         }
 
         private void Update()
         {
-            if(Time.timeScale==0)return;
+            if (!EncountersActive || Time.timeScale == 0) return;
             spawnIn -= Time.deltaTime;
             attackIn -= Time.deltaTime;
             if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) TryAttack(Vector2.zero);
@@ -90,7 +94,8 @@ namespace BrokenHeart.Combat
 
         public bool TryAttack(Vector2 aim)
         {
-            if (Time.timeScale == 0 || attackIn > 0 || motor.InputSuppressed || inventory.IsOpen || inventory.IsMapOpen)
+            if (!EncountersActive || Time.timeScale == 0 || attackIn > 0 || motor.InputSuppressed ||
+                inventory.IsOpen || inventory.IsMapOpen)
                 return false;
             var item = inventory.Selected.Item;
             bool armed = item != null && item.AttackDamage > 0;
@@ -137,7 +142,7 @@ namespace BrokenHeart.Combat
         }
         public EnemyActor Spawn(EnemyData data,Vector2 position)
         {
-            if(actors.Count>=6)return null;
+            if (!EncountersActive || actors.Count >= 6) return null;
             var go=new GameObject(data.name,typeof(SpriteRenderer),typeof(Rigidbody2D),typeof(BoxCollider2D)); go.layer=2; go.transform.position=position;
             var visual=go.GetComponent<SpriteRenderer>(); visual.sprite=data.sprite; visual.sharedMaterial=material; visual.sortingOrder=9;
             var body=go.GetComponent<Rigidbody2D>(); body.gravityScale=2; body.constraints=RigidbodyConstraints2D.FreezeRotation;
@@ -158,8 +163,10 @@ namespace BrokenHeart.Combat
         {
             for (int i = actors.Count - 1; i >= 0; i--) Remove(actors[i], false);
             attackIn = 0;
-            weaponSwing.enabled = false;
+            if (weaponSwing != null) weaponSwing.enabled = false;
         }
+        private void OnDisable() => Clear();
+
         public bool Nearby(float radius)
         { foreach(var actor in actors)if(Vector2.Distance(actor.transform.position,player.transform.position)<radius)return true; return false; }
     }

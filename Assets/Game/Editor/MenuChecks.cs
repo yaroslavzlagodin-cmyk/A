@@ -42,6 +42,7 @@ namespace BrokenHeart.Editor
         {
             if(EditorApplication.isPlayingOrWillChangePlaymode)return;
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            LobbyStartup.UseLobby();
             SessionState.SetString(EditorSceneKey, EditorSceneManager.GetActiveScene().name);
             Directory.CreateDirectory("Logs");File.WriteAllText(Report,"RUNNING\n");
             SessionState.SetBool(Key,true);EditorApplication.isPlaying=true;
@@ -256,9 +257,8 @@ namespace BrokenHeart.Editor
 
             var enemies = Object.FindAnyObjectByType<EnemySystem>();
             var enemy = enemies.Spawn(enemies.Types[0], (Vector2)inventory.transform.position + Vector2.right * 8);
-            enemy.Damage(float.MaxValue);
-            enemy.Damage(float.MaxValue);
-            Check(inventory.Progress.TotalExperience == 121, "Defeating one enemy awards experience once.");
+            Check(enemy == null && inventory.Progress.TotalExperience == 101,
+                "Paused monster encounters award no experience.");
 
             var focus = crafting.Recipes.Single(recipe => recipe.Id == "crystal_focus");
             memory.UnlockMindProtection();

@@ -139,7 +139,7 @@ namespace BrokenHeart.Systems
             float dt = Time.deltaTime;
             rain.transform.position = observer.position + Vector3.up * 14;
             fog.transform.position = observer.position + Vector3.up * 2;
-            if (Keyboard.current != null && Keyboard.current.f6Key.wasPressedThisFrame)
+            if (Debug.isDebugBuild && Keyboard.current != null && Keyboard.current.f6Key.wasPressedThisFrame)
                 SetWeather((WeatherKind)(((int)Current + 1) % 4));
             changeIn -= dt;
             if (changeIn <= 0) ChooseWeather();

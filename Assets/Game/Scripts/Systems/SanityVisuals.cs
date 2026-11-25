@@ -9,12 +9,16 @@ namespace BrokenHeart.Systems
         [SerializeField] private BlockWorld world;
         [SerializeField] private Sprite eyeSprite,shadowSprite;
         [SerializeField] private Material material;
+        // Sanity still changes while its apparitions are paused.
+        [SerializeField] private bool hallucinationsEnabled = false;
         private SpriteRenderer eyes,shadow,phantom;
         private Vector3 shadowOrigin;
         private float manifestIn=4;
         public bool EyesVisible=>eyes!=null && eyes.gameObject.activeSelf;
+        private bool VisualsActive => hallucinationsEnabled && isActiveAndEnabled;
         private void Awake()
         {
+            if (!hallucinationsEnabled) return;
             eyes=Create("Unreal eyes",eyeSprite,Color.white);
             shadow=Create("Moving shadow",shadowSprite,new Color(0.12f,0.08f,0.18f,0.4f));
             shadow.transform.localScale=new Vector3(1.2f,2.2f,1);
@@ -26,9 +30,15 @@ namespace BrokenHeart.Systems
             var visual=go.GetComponent<SpriteRenderer>();visual.sprite=sprite;visual.sharedMaterial=material;visual.color=color;visual.sortingOrder=15;
             go.SetActive(false);return visual;
         }
-        public void ShowEyes(Vector3 position){eyes.transform.position=position;eyes.gameObject.SetActive(sanity.Value<55);}
+        public void ShowEyes(Vector3 position)
+        {
+            if (!VisualsActive || eyes == null) return;
+            eyes.transform.position = position;
+            eyes.gameObject.SetActive(sanity.Value < 55);
+        }
         public void RefreshEffects()
         {
+            if (!VisualsActive || eyes == null) return;
             if(sanity.Value>=55 || Vector2.Distance(eyes.transform.position,observer.position)<3)eyes.gameObject.SetActive(false);
             if(sanity.Value>=70)shadow.gameObject.SetActive(false);
             if(sanity.Value>=25 || Vector2.Distance(phantom.transform.position,observer.position)<2.5f)phantom.gameObject.SetActive(false);
@@ -36,6 +46,7 @@ namespace BrokenHeart.Systems
         }
         private void Update()
         {
+            if (!VisualsActive || eyes == null) return;
             manifestIn-=Time.deltaTime;
             if(manifestIn<=0)
             {
@@ -49,6 +60,13 @@ namespace BrokenHeart.Systems
                 phantom.transform.position=new Vector3(x,y-1,0);phantom.gameObject.SetActive(sanity.Value<25);
             }
             RefreshEffects();
+        }
+
+        private void OnDisable()
+        {
+            if (eyes != null) eyes.gameObject.SetActive(false);
+            if (shadow != null) shadow.gameObject.SetActive(false);
+            if (phantom != null) phantom.gameObject.SetActive(false);
         }
     }
 }

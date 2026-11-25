@@ -14,6 +14,8 @@ namespace BrokenHeart.World
         [SerializeField] private RectInt bounds = new(-64, -24, 128, 56);
         [SerializeField] private WorldGenerationData generation;
         [SerializeField] private Transform observer;
+        // Controls both the shadow mask and depth tint on terrain tiles.
+        [SerializeField] private bool terrainShadowsEnabled = false;
         private readonly HashSet<Vector2Int> visible = new();
         private Vector2Int lastChunk = new(int.MinValue, int.MinValue);
         private readonly Dictionary<string, BlockData> definitions = new();
@@ -34,6 +36,7 @@ namespace BrokenHeart.World
         public int VisibleChunks => visible.Count;
         public int ExplorationRevision { get; private set; }
         internal int TerrainRevision { get; private set; }
+        internal bool TerrainShadowsEnabled => terrainShadowsEnabled;
         public event System.Action<Vector2Int> CellChanged;
         public IEnumerable<Vector2Int> ExploredCells => explored;
         public void Configure(int newSeed,RectInt newBounds,WorldGenerationData settings)
@@ -60,7 +63,7 @@ namespace BrokenHeart.World
             renderer.sortingLayerID = foreground.sortingLayerID;
             renderer.sortingOrder = foreground.sortingOrder - 1;
             ResetWorld(seed);
-            if (generation != null && observer != null)
+            if (terrainShadowsEnabled && generation != null && observer != null)
                 gameObject.AddComponent<SubsurfaceShadows>().Initialize(this, observer, clock);
         }
 
@@ -139,16 +142,16 @@ namespace BrokenHeart.World
 
         internal bool IsSolidId(string id) => id != null && definitions.TryGetValue(id, out var block) && block.Solid;
 
-        private static Color ForegroundColor(int depth)
+        private Color ForegroundColor(int depth)
         {
-            if (depth < 1) return Color.white;
+            if (!terrainShadowsEnabled || depth < 1) return Color.white;
             float shade = 1 - Mathf.SmoothStep(0, 0.22f, depth / 28f);
             return new Color(shade, shade, Mathf.Min(1, shade * 1.08f));
         }
 
-        private static Color WallColor(int depth)
+        private Color WallColor(int depth)
         {
-            float shade = Mathf.Lerp(0.56f, 0.39f, Mathf.Clamp01(depth / 34f));
+            float shade = terrainShadowsEnabled ? Mathf.Lerp(0.56f, 0.39f, Mathf.Clamp01(depth / 34f)) : 0.56f;
             return new Color(shade * 0.83f, shade * 0.87f, shade);
         }
 

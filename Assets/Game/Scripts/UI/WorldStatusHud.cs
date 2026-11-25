@@ -98,7 +98,7 @@ namespace BrokenHeart.UI
             }
 
             if (inventory.IsOpen) return;
-            string message = sleep != null && sleep.Status != "H: rest 8s / F8: sanity -20 (debug)" ? sleep.Status : "";
+            string message = sleep != null ? sleep.Status : "";
             if (!string.IsNullOrEmpty(message))
             {
                 var notice = new Rect((Width - 590) / 2, Height - 133, 590, 27);

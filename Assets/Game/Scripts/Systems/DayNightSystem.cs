@@ -36,7 +36,7 @@ namespace BrokenHeart.Systems
         private void Update()
         {
             if (Time.timeScale == 0) return;
-            if (Keyboard.current != null && Keyboard.current.f7Key.wasPressedThisFrame) Advance(dayLength / 4);
+            if (Debug.isDebugBuild && Keyboard.current != null && Keyboard.current.f7Key.wasPressedThisFrame) Advance(dayLength / 4);
             Advance(Time.deltaTime);
             shade = Mathf.MoveTowards(shade, DepthShade(), Time.deltaTime * 1.8f);
             ApplyLighting();
@@ -73,7 +73,7 @@ namespace BrokenHeart.Systems
 
         private float DepthShade()
         {
-            if (world == null || weather == null || weather.Observer == null) return 0;
+            if (world == null || !world.TerrainShadowsEnabled || weather == null || weather.Observer == null) return 0;
             int depth = world.DepthAt(world.CellAt(weather.Observer.position));
             return Mathf.SmoothStep(0, 1, (depth - 2) / 14f);
         }

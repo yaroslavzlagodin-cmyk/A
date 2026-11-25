@@ -254,9 +254,11 @@ namespace BrokenHeart.Editor
             }
             else if (step == 5)
             {
-                var shadows = Object.FindAnyObjectByType<SubsurfaceShadows>();
-                Check(shadows.OpacityAt(new Vector2Int(0, 0)) < shadows.OpacityAt(new Vector2Int(0, -2)) &&
-                    shadows.OpacityAt(new Vector2Int(0, -4)) == 255, "Sunlit blocks fade softly to an opaque fifth layer.");
+                var map = Object.FindAnyObjectByType<BlockWorld>().Map;
+                var underground = new Vector3Int(0, -4, 0);
+                Check(Object.FindAnyObjectByType<SubsurfaceShadows>() == null &&
+                    map.HasTile(underground) && map.GetColor(underground) == Color.white,
+                    "Terrain has no shadow mask or depth tint while terrain shadows are paused.");
                 CapturePreview();
                 var clock = Object.FindAnyObjectByType<DayNightSystem>();
                 if (clock == null) { Finish(); return; }
@@ -264,8 +266,6 @@ namespace BrokenHeart.Editor
             }
             else if (step == 6)
             {
-                Check(Object.FindAnyObjectByType<SubsurfaceShadows>().OpacityAt(new Vector2Int(0, -2)) == 255,
-                    "Weak night light stops at about three blocks.");
                 CapturePreview("Logs/NightPreview.png");
                 Object.FindAnyObjectByType<DayNightSystem>().SetHour(12);
                 Object.FindAnyObjectByType<WorldWeather>().SetWeather(WeatherKind.Storm);
@@ -710,22 +710,23 @@ namespace BrokenHeart.Editor
             var clock=Object.FindAnyObjectByType<DayNightSystem>(); if(clock==null)return;
             var weather=Object.FindAnyObjectByType<WorldWeather>(); var enemies=Object.FindAnyObjectByType<EnemySystem>();
             weather.SetWeather(WeatherKind.Clear); clock.SetHour(12); float noon=clock.Intensity;
-            Check(!enemies.Eligible(enemies.Types[0],new Vector2(0,2)),"Forest enemies do not spawn in daylight.");
             clock.SetHour(0);
-            Check(clock.IsNight && clock.Intensity < noon * 0.12f && enemies.Eligible(enemies.Types[0],new Vector2(0,2)),
-                "Night sharply reduces ambient light and enables forest enemies.");
-            Check(enemies.Eligible(enemies.Types[1],new Vector2(0,-20)),"Cave enemy follows underground spawn rule.");
+            Check(clock.IsNight && clock.Intensity < noon * 0.12f, "Night sharply reduces ambient light.");
+            Check(!enemies.Eligible(enemies.Types[0], new Vector2(0, 1)) &&
+                !enemies.Eligible(enemies.Types[1], new Vector2(0, -20)),
+                "Forest and cave monsters are paused even in their usual spawn conditions.");
+            Check(enemies.Spawn(enemies.Types[0], (Vector2)player.transform.position + Vector2.right * 2) == null &&
+                enemies.Actors.Count == 0 && !enemies.TryAttack(Vector2.right),
+                "Direct monster spawning and attacks are paused.");
             weather.SetWeather(WeatherKind.Storm);
             Check(weather.RainRate>0,"Storm enables rain particles.");
             weather.SetWeather(WeatherKind.Clear); Check(weather.RainRate==0,"Clear weather disables rain.");
-            var actor=enemies.Spawn(enemies.Types[0],(Vector2)player.transform.position+Vector2.right*8);
-            actor.Damage(100); Check(enemies.Actors.Count==0,"Enemy death removes actor and creates loot.");
-            CheckArsenal(enemies);
-            var vitals=player.GetComponent<PlayerVitals>(); vitals.Damage(8); Check(vitals.Health==92,"Enemy damage reduces player health.");
+            CheckArsenal();
+            var vitals=player.GetComponent<PlayerVitals>(); vitals.Damage(8); Check(vitals.Health==92,"Damage reduces player health.");
             vitals.Restore(100); clock.SetHour(10);
         }
 
-        private static void CheckArsenal(EnemySystem enemies)
+        private static void CheckArsenal()
         {
             var inventory = player.GetComponent<PlayerInventory>();
             var catalog = inventory.Catalog;
@@ -750,16 +751,6 @@ namespace BrokenHeart.Editor
                   pick.MiningPowerFor(stone) > 1 && pick.MiningPowerFor(dirt) == 1 &&
                   shovel.MiningPowerFor(dirt) > 1 && shovel.MiningPowerFor(wood) == 1,
                 "Tools speed up only the materials they are designed for.");
-            var original = inventory.Model.Copy();
-            var loadout = Enumerable.Range(0, original.Capacity).Select(index => original[index]).ToArray();
-            loadout[0] = new ItemStack(catalog.Find("iron_sword"), 1);
-            inventory.Model.Restore(loadout);
-            inventory.Select(0);
-            var position = (Vector2)player.transform.position + Vector2.right * 1.9f;
-            var target = enemies.Spawn(enemies.Types[0], position);
-            Check(target != null && enemies.TryAttack(Vector2.right) && enemies.Actors.Count == 0 &&
-                !enemies.TryAttack(Vector2.right), "An equipped sword damages an enemy in reach and enforces its cooldown.");
-            inventory.Model.ReplaceWith(original);
         }
 
         private static void CheckSanity()
@@ -778,8 +769,8 @@ namespace BrokenHeart.Editor
             bool memory=false;foreach(var id in player.GetComponent<MemorySystem>().Unlocked)if(id=="memory.mind_protection")memory=true;
             Check(memory,"First collapse unlocks mind-protection memory.");
             var eyes=Object.FindAnyObjectByType<SanityVisuals>();eyes.ShowEyes(player.transform.position+Vector3.right*8);eyes.RefreshEffects();
-            Check(eyes.EyesVisible,"Low sanity reveals distant eyes.");
-            eyes.ShowEyes(player.transform.position+Vector3.right);eyes.RefreshEffects();Check(!eyes.EyesVisible,"Eyes vanish when approached.");
+            Check(!eyes.EyesVisible && eyes.transform.Find("Moving shadow") == null &&
+                eyes.transform.Find("False stone") == null, "Low sanity creates no apparitions while those effects are paused.");
             Check(Object.FindAnyObjectByType<NoxelDirector>() == null, "The game scene no longer runs Noxel's taunts.");
             var save=Object.FindAnyObjectByType<SaveSystem>();var snapshot=save.Capture();sanity.Adjust(80);save.Restore(JsonUtility.FromJson<SaveData>(JsonUtility.ToJson(snapshot)));
             Check(sanity.Value==0 && sanity.HasReachedZero,"Sanity and first-collapse state survive JSON roundtrip.");
