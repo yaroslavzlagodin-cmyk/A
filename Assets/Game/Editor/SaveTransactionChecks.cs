@@ -36,8 +36,11 @@ namespace BrokenHeart.Editor
             Require(!SaveTransactionStore.Import(current, legacy), "Legacy import replaced existing data.");
             Require(File.ReadAllText(oldLibraryPath) == originalLibrary && File.ReadAllText(oldWorldPath) == originalWorld,
                 "Legacy import changed an original file.");
-            Require(SaveTransactionStore.Read(current).ReadWorld(first.id).generatorVersion == WorldGenerationData.LegacyVersion,
+            var imported = SaveTransactionStore.Read(current);
+            Require(imported.ReadWorld(first.id).generatorVersion == WorldGenerationData.LegacyVersion,
                 "The old world changed generator versions.");
+            Require(!imported.HasWorld(second.id), "A world with no saved journey must remain ready for its first visit.");
+            CheckMissingLegacyWorld(root, originalLibrary);
 
             SaveTransactionStore.Update(current, save => save.WriteWorld(second.id, MakeWorld(second, 3, 40)));
             WriteJourney(current, first, 5);
@@ -55,19 +58,55 @@ namespace BrokenHeart.Editor
                 CheckJourney(SaveTransactionStore.Read(current), first, second, point == "after-manifest" ? 7 : 5);
             }
 
+            string primaryManifest = Path.Combine(current, SaveTransactionStore.ManifestFileName);
+            CheckMissingManifestWorld(current, primaryManifest, first, second);
+
             var rejected = SaveTransactionStore.Read(current, candidate =>
             {
                 if (candidate.ReadWorld(first.id).elapsed == 7) throw new InvalidDataException("Rejected by gameplay.");
             });
             Require(rejected.Recovered, "A rejected candidate did not select the backup.");
             CheckJourney(rejected, first, second, 5);
-            File.WriteAllText(Path.Combine(current, SaveTransactionStore.ManifestFileName), "{");
+            File.WriteAllText(primaryManifest, "{");
             var recovered = SaveTransactionStore.Read(current);
             Require(recovered.Recovered, "A corrupt manifest did not select the backup.");
             CheckJourney(recovered, first, second, 5);
             WriteJourney(current, first, 10);
             CheckJourney(SaveTransactionStore.Read(current), first, second, 10);
+            SaveTransactionStore.Update(current, save => save.Library.worlds.RemoveAll(world => world.id == first.id));
+            Require(!SaveTransactionStore.Read(current).HasWorld(first.id),
+                "A removed world profile must not require its old world data.");
             Debug.Log("SAVE TRANSACTION CHECKS: PASS");
+        }
+
+        private static void CheckMissingLegacyWorld(string root, string libraryJson)
+        {
+            string incomplete = Path.Combine(root, "incomplete-legacy");
+            string target = Path.Combine(root, "rejected-import");
+            SaveFileStore.WriteAtomic(Path.Combine(incomplete, "library.json"), libraryJson);
+            bool rejected = false;
+            try { SaveTransactionStore.Import(target, incomplete); }
+            catch (InvalidDataException) { rejected = true; }
+            Require(rejected && !File.Exists(Path.Combine(target, SaveTransactionStore.ManifestFileName)),
+                "A missing legacy world with saved progress must not be imported as a fresh world.");
+        }
+
+        private static void CheckMissingManifestWorld(string root, string manifestPath, WorldProfile first, WorldProfile second)
+        {
+            string original = File.ReadAllText(manifestPath);
+            int worldListStart = original.IndexOf('[', original.IndexOf("\"worlds\"", StringComparison.Ordinal));
+            int worldListEnd = original.LastIndexOf(']');
+            File.WriteAllText(manifestPath, original.Remove(worldListStart + 1, worldListEnd - worldListStart - 1));
+            try
+            {
+                var recovered = SaveTransactionStore.Read(root);
+                Require(recovered.Recovered, "A manifest missing an established world must select the backup.");
+                CheckJourney(recovered, first, second, 5);
+            }
+            finally
+            {
+                File.WriteAllText(manifestPath, original);
+            }
         }
 
         private static SaveData MakeWorld(WorldProfile world, int generator, int elapsed) => new()

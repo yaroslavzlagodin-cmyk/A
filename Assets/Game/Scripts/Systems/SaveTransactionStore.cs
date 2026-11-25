@@ -210,6 +210,7 @@ namespace BrokenHeart.Systems
                 ValidateWorld(profile, world);
                 loaded.Snapshot.Worlds.Add(record.id, world);
             }
+            ValidateJourneyWorlds(loaded.Snapshot, profiles);
             return loaded;
         }
 
@@ -243,7 +244,18 @@ namespace BrokenHeart.Systems
                 ValidateWorld(profile, world);
                 loaded.Snapshot.Worlds.Add(profile.id, world);
             }
+            ValidateJourneyWorlds(loaded.Snapshot, profiles);
             return loaded;
+        }
+
+        private static void ValidateJourneyWorlds(SaveSnapshot snapshot, Dictionary<string, WorldProfile> profiles)
+        {
+            foreach (var journey in snapshot.Library.journeys)
+            {
+                // A journey means this world already has a save, unless the player removed its profile.
+                if (profiles.ContainsKey(journey.worldId) && !snapshot.Worlds.ContainsKey(journey.worldId))
+                    throw new InvalidDataException("A saved journey is missing its world data.");
+            }
         }
 
         private static bool HasLegacyWorldFiles(string folder)
@@ -260,6 +272,7 @@ namespace BrokenHeart.Systems
             var profiles = ValidateLibrary(snapshot.Library);
             foreach (string id in snapshot.ChangedWorlds)
                 if (!profiles.ContainsKey(id)) throw new InvalidDataException("World save has no matching profile.");
+            ValidateJourneyWorlds(snapshot, profiles);
             foreach (var profile in profiles.Values)
                 if (snapshot.Worlds.TryGetValue(profile.id, out var world)) ValidateWorld(profile, world);
 

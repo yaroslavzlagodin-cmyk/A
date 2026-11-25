@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BrokenHeart.Combat;
+using BrokenHeart.Crafting;
 using BrokenHeart.Inventory;
 using BrokenHeart.Player;
 using BrokenHeart.Systems;
+using BrokenHeart.Systems.Energy;
 using BrokenHeart.UI;
 using BrokenHeart.World;
 using UnityEngine;
@@ -15,8 +17,12 @@ namespace BrokenHeart.Core.Profiles
 {
     internal sealed class WindowsSmoke : MonoBehaviour
     {
+        private static readonly Vector2Int ChestCell = new(-3, 2), FurnaceCell = new(2, 2), LampCell = new(18, 2);
+        private static readonly Vector3 FirstPosition = new(-0.5f, 4, 0), SecondPosition = new(7.5f, 4, 0);
+        private const float PartialSmelt = 1.5f, LampCharge = 6.25f;
         private WorldProfile worldProfile;
         private CharacterProfile character;
+        private CharacterProfile companion;
         private CharacterProfile hardcore;
         private (WorldProfile world, CharacterProfile hero, int generation) legacyJourney;
 
@@ -36,10 +42,12 @@ namespace BrokenHeart.Core.Profiles
                 var legacy = ImportLegacyFixture(arguments, smokeRoot);
                 var world = new WorldProfile { name = "Smoke test world", seed = "20261125", difficulty = 0 };
                 var hero = new CharacterProfile { name = "Smoke test hero", challenge = 2 };
+                var secondHero = new CharacterProfile { name = "Smoke companion" };
                 var hardcoreHero = new CharacterProfile { name = "Smoke hardcore hero", challenge = 5 };
                 var library = ProfileLibrary.Load();
                 library.worlds.Add(world);
                 library.characters.Add(hero);
+                library.characters.Add(secondHero);
                 library.characters.Add(hardcoreHero);
                 ProfileLibrary.Save(library);
 
@@ -47,6 +55,7 @@ namespace BrokenHeart.Core.Profiles
                 var runner = new GameObject("Windows smoke test").AddComponent<WindowsSmoke>();
                 runner.worldProfile = world;
                 runner.character = hero;
+                runner.companion = secondHero;
                 runner.hardcore = hardcoreHero;
                 runner.legacyJourney = legacy;
                 DontDestroyOnLoad(runner.gameObject);
@@ -73,23 +82,7 @@ namespace BrokenHeart.Core.Profiles
                     save != null && save.Status == "Save loaded", "The selected fresh world must load.");
                 Debug.Log("WINDOWS SMOKE: Lobby and fresh world passed.");
 
-                // Save a world edit and a hero change through the usual exit action.
-                var cell = new Vector2Int(12, world.Generator.Surface(12) + 4);
-                string block = world.Store.Get(cell) == null ? "dirt" : null;
-                Require(world.Store.Set(cell, block), "Could not edit the smoke test world.");
-                int selected = inventory.HotbarSize - 1;
-                inventory.Select(selected);
-                Require(FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(true), save.Status);
-                await WaitForScene("Menu");
-                Require(!SessionContext.Active && ProfileLibrary.Load().journeys.Exists(
-                    journey => journey.worldId == worldProfile.id && journey.characterId == character.id),
-                    "Save and exit must record the journey and clear the session.");
-
-                FindAnyObjectByType<FrontEndMenu>().Launch(worldProfile, character);
-                await WaitForScene("Game");
-                Require(FindAnyObjectByType<BlockWorld>().Store.Get(cell) == block &&
-                    FindAnyObjectByType<PlayerInventory>().SelectedIndex == selected,
-                    "Reopening the world must restore the terrain edit and selected slot.");
+                await CheckSharedWorld(world, inventory);
                 await CheckAutosaves();
                 await CheckDeaths();
                 Require(FindAnyObjectByType<FrontEndMenu>().Page == "main" && !SessionContext.Active,
@@ -98,6 +91,135 @@ namespace BrokenHeart.Core.Profiles
                 Application.Quit(0);
             }
             catch (Exception error) { Fail(error); }
+        }
+
+        private async Awaitable CheckSharedWorld(BlockWorld world, PlayerInventory inventory)
+        {
+            var cell = new Vector2Int(12, world.Generator.Surface(12) + 4);
+            string block = world.Store.Get(cell) == null ? "dirt" : null;
+            Require(world.Store.Set(cell, block), "Could not edit the smoke test world.");
+            SetUpWorkshop(world, inventory.Catalog);
+
+            int selected = inventory.HotbarSize - 1;
+            int backpackSlot = PlayerInventory.EquipmentCount - PlayerInventory.BackpackCount;
+            var backpack = inventory.Catalog.Find("trail_backpack");
+            Require(inventory.Model.Add(backpack, 1) == 0, "Could not supply the first hero's backpack.");
+            int packIndex = Enumerable.Range(0, inventory.Model.Capacity).First(index => inventory.Model[index].Item == backpack);
+            Require(inventory.Equip(packIndex, backpackSlot), "Could not equip the first hero's backpack.");
+            var copper = inventory.Catalog.Find("copper_ingot");
+            inventory.Model.SetSlot(inventory.Model.Capacity - 1, new ItemStack(copper, 4));
+            inventory.Select(selected);
+            MoveHero(inventory, FirstPosition);
+            var save = world.GetComponent<SaveSystem>();
+            Require(FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(true), save.Status);
+            await WaitForScene("Menu");
+            Require(!SessionContext.Active, "Save and exit must clear the session.");
+
+            FindAnyObjectByType<FrontEndMenu>().Launch(worldProfile, companion);
+            await WaitForScene("Game");
+            world = FindAnyObjectByType<BlockWorld>();
+            inventory = FindAnyObjectByType<PlayerInventory>();
+            save = world.GetComponent<SaveSystem>();
+            Require(save.Status == "Save loaded" && world.Store.Get(cell) == block &&
+                inventory.Model.Count(inventory.Catalog.Find("copper_ingot")) == 0 &&
+                inventory.Model.Capacity == inventory.BaseCapacity &&
+                Mathf.Approximately(inventory.transform.position.x, 0.5f),
+                "A new hero must see the world edit and receive an independent inventory and spawn.");
+            // Reload within one frame so simulation cannot advance the furnace or consume charge before inspection.
+            Require(save.Load(), save.Status);
+            CheckRestoredWorkshop(world, inventory.Catalog);
+
+            Require(inventory.Model.Add(inventory.Catalog.Find("iron_ingot"), 2) == 0,
+                "Could not supply the second hero's items.");
+            inventory.Select(3);
+            MoveHero(inventory, SecondPosition);
+            Require(FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(true), save.Status);
+            await WaitForScene("Menu");
+            var journeys = ProfileLibrary.Load().journeys;
+            Require(journeys.Exists(journey => journey.worldId == worldProfile.id &&
+                    journey.characterId == character.id && journey.position == FirstPosition) &&
+                journeys.Exists(journey => journey.worldId == worldProfile.id &&
+                    journey.characterId == companion.id && journey.position == SecondPosition),
+                "The same world must remember both heroes' positions independently.");
+
+            FindAnyObjectByType<FrontEndMenu>().Launch(worldProfile, companion);
+            await WaitForScene("Game");
+            inventory = FindAnyObjectByType<PlayerInventory>();
+            Require(FindAnyObjectByType<SaveSystem>().Status == "Save loaded" &&
+                inventory.Model.Count(inventory.Catalog.Find("iron_ingot")) == 2 &&
+                inventory.Model.Count(inventory.Catalog.Find("copper_ingot")) == 0 &&
+                inventory.SelectedIndex == 3 && Mathf.Approximately(inventory.transform.position.x, SecondPosition.x),
+                "Reopening the second hero must restore only that hero's items and location.");
+            Require(FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(false), "Could not exit the second hero's session.");
+            await WaitForScene("Menu");
+
+            FindAnyObjectByType<FrontEndMenu>().Launch(worldProfile, character);
+            await WaitForScene("Game");
+            inventory = FindAnyObjectByType<PlayerInventory>();
+            var overflowSlot = inventory.Model[inventory.Model.Capacity - 1];
+            Require(FindAnyObjectByType<SaveSystem>().Status == "Save loaded" &&
+                FindAnyObjectByType<BlockWorld>().Store.Get(cell) == block && inventory.SelectedIndex == selected &&
+                Mathf.Approximately(inventory.transform.position.x, FirstPosition.x) &&
+                inventory.Equipped(backpackSlot).Item == inventory.Catalog.Find("trail_backpack") &&
+                overflowSlot.Item == inventory.Catalog.Find("copper_ingot") && overflowSlot.Count == 4 &&
+                inventory.Model.Count(inventory.Catalog.Find("iron_ingot")) == 0,
+                "Returning to the first hero must restore the shared edit and that hero's own backpack and position.");
+            Debug.Log("WINDOWS SMOKE: Shared world and independent hero positions and backpacks passed.");
+        }
+
+        private static void SetUpWorkshop(BlockWorld world, ItemCatalog catalog)
+        {
+            var stations = world.GetComponent<WorkstationSystem>();
+            var stone = catalog.Find("stone");
+            PrepareSpace(ChestCell, false);
+            PrepareSpace(FurnaceCell, true);
+            PrepareSpace(LampCell, false);
+            var chest = stations.Place(catalog.Find("chest"), ChestCell);
+            var furnace = stations.Place(catalog.Find("furnace"), FurnaceCell);
+            Require(chest != null && furnace != null, "Could not place a chest and furnace.");
+            chest.Contents.SetSlot(chest.Contents.Capacity - 1, new ItemStack(stone, 3));
+            furnace.Contents.SetSlot(Workstation.OreSlot, new ItemStack(catalog.Find("copper_ore"), 2));
+            furnace.Contents.SetSlot(Workstation.FuelSlot, new ItemStack(catalog.Find("wood"), 1));
+            stations.Tick(PartialSmelt);
+            var energy = world.GetComponent<EnergyNetwork>();
+            Require(energy.CanPlace(LampCell), "Could not place an isolated energy device.");
+            energy.Spawn(catalog.Find("crystal_lamp"), world.Center(LampCell), LampCharge);
+
+            void PrepareSpace(Vector2Int anchor, bool fullSizeFurnace)
+            {
+                foreach (var offset in Workstation.Footprint(fullSizeFurnace))
+                {
+                    var cell = anchor + offset;
+                    world.Set(cell, null);
+                    if (offset.y == 0) world.Set(cell + Vector2Int.down, stone.PlaceableBlock);
+                }
+            }
+        }
+
+        private static void CheckRestoredWorkshop(BlockWorld world, ItemCatalog catalog)
+        {
+            var stations = world.GetComponent<WorkstationSystem>();
+            var chest = stations.At(ChestCell);
+            var furnace = stations.At(FurnaceCell);
+            Require(chest?.Kind == StationKind.Chest && furnace?.Kind == StationKind.Furnace,
+                "Saving must preserve both workstations.");
+            var chestSlot = chest.Contents[chest.Contents.Capacity - 1];
+            var ore = furnace.Contents[Workstation.OreSlot];
+            Require(chestSlot.Item == catalog.Find("stone") && chestSlot.Count == 3,
+                "The restored chest must preserve its items and slot.");
+            Require(furnace.FullSizeFurnace && ore.Item == catalog.Find("copper_ore") && ore.Count == 2 &&
+                furnace.Contents[Workstation.FuelSlot].Empty && furnace.Contents[Workstation.OutputSlot].Empty &&
+                Mathf.Approximately(furnace.SmeltSeconds, PartialSmelt) &&
+                Mathf.Approximately(furnace.BurnRemaining, catalog.Find("wood").FuelSeconds - PartialSmelt),
+                "The restored furnace must keep its ore, progress, and remaining burn time.");
+            stations.Tick(Workstation.SecondsPerIngot - PartialSmelt);
+            var product = furnace.Contents[Workstation.OutputSlot];
+            Require(product.Item == catalog.Find("copper_ingot") && product.Count == 1,
+                "The restored furnace must finish the partial smelt.");
+            var lamp = world.GetComponent<EnergyNetwork>().At(LampCell);
+            Require(lamp != null && lamp.Item == catalog.Find("crystal_lamp") &&
+                Mathf.Approximately(lamp.Stored, LampCharge), "The restored energy device must keep its charge.");
+            Debug.Log("WINDOWS SMOKE: Chest contents, partial smelting, and stored energy passed.");
         }
 
         private static (WorldProfile world, CharacterProfile hero, int generation) ImportLegacyFixture(
@@ -226,14 +348,18 @@ namespace BrokenHeart.Core.Profiles
 
         private static PlayerVitals KillHero(PlayerInventory inventory, float x)
         {
-            var body = inventory.GetComponent<Rigidbody2D>();
-            var position = new Vector3(x, 4, 0);
-            inventory.transform.position = position;
-            body.position = position;
-            body.linearVelocity = Vector2.zero;
+            MoveHero(inventory, new Vector3(x, 4, 0));
             var vitals = inventory.GetComponent<PlayerVitals>();
             vitals.Damage(10000);
             return vitals;
+        }
+
+        private static void MoveHero(PlayerInventory inventory, Vector3 position)
+        {
+            var body = inventory.GetComponent<Rigidbody2D>();
+            inventory.transform.position = position;
+            body.position = position;
+            body.linearVelocity = Vector2.zero;
         }
 
         private static CharacterProfile ReadHero(string id) => ProfileLibrary.Load().characters.Find(hero => hero.id == id);
