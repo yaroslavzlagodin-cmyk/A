@@ -83,6 +83,7 @@ namespace BrokenHeart.Editor
                     else if (command == "sanity") FoundationUpgrade.SanityStage();
                     else if (command == "terrain") { EditorSceneManager.OpenScene(PrototypeBuilder.ScenePath); PrototypeBuilder.RefreshTerrain(); }
                     else if (command == "menu") MenuSetup.Build();
+                    else if (command == "windowsdev") WindowsBuild.BuildDevelopment();
                     else if (command == "menucheck") MenuChecks.Run();
                 }
                 catch (Exception error) { File.WriteAllText(ReportPath, "FAIL: " + error); Debug.LogException(error); }
@@ -1168,18 +1169,172 @@ namespace BrokenHeart.Editor
             Check(sanity.Value==0 && collapses==1,"Sanity clamps at zero and first-collapse fires once.");
             bool memory=false;foreach(var id in player.GetComponent<MemorySystem>().Unlocked)if(id=="memory.mind_protection")memory=true;
             Check(memory,"First collapse unlocks mind-protection memory.");
-            var eyes=Object.FindAnyObjectByType<SanityVisuals>();eyes.ShowEyes(player.transform.position+Vector3.right*8);eyes.RefreshEffects();
-            Check(!eyes.EyesVisible && eyes.transform.Find("Moving shadow") == null &&
-                eyes.transform.Find("False stone") == null, "Low sanity creates no apparitions while those effects are paused.");
             Check(Object.FindAnyObjectByType<NoxelDirector>() == null, "The game scene no longer runs Noxel's taunts.");
             var save=Object.FindAnyObjectByType<SaveSystem>();var snapshot=save.Capture();sanity.Adjust(80);save.Restore(JsonUtility.FromJson<SaveData>(JsonUtility.ToJson(snapshot)));
             Check(sanity.Value==0 && sanity.HasReachedZero,"Sanity and first-collapse state survive JSON roundtrip.");
-            sanity.Restore(100,0,true);eyes.RefreshEffects();
+            CheckDemonEvents(sanity);
+            sanity.Restore(100,0,true);
             var sleep=player.GetComponent<SleepSystem>();
             Check(sleep.TryRest() && player.InputSuppressed,"Safe rest suppresses movement.");
             player.GetComponent<PlayerVitals>().Damage(1);
             Check(!sleep.Resting && !player.InputSuppressed,"Damage interrupts sleep and restores movement.");
             player.GetComponent<PlayerVitals>().Restore(100);sanity.Restore(100,0,true);
+        }
+
+        private static void CheckDemonEvents(SanitySystem sanity)
+        {
+            var world = Object.FindAnyObjectByType<BlockWorld>();
+            var save = world.GetComponent<SaveSystem>();
+            var original = save.Capture();
+            var clock = world.GetComponent<DayNightSystem>();
+            var effects = world.GetComponent<SanityVisuals>();
+            var enemies = world.GetComponent<EnemySystem>();
+            var catalog = player.GetComponent<PlayerInventory>().Catalog;
+            var thresholds = new[] { 70, 50, 30, 15, 0 };
+            try
+            {
+                int notifications = 0, collapses = 0;
+                void CountStage(SanityStage _) => notifications++;
+                void CountCollapse() => collapses++;
+                sanity.StageChanged += CountStage;
+                sanity.FirstCollapse += CountCollapse;
+                try
+                {
+                    for (int i = 0; i < thresholds.Length; i++)
+                    {
+                        int threshold = thresholds[i];
+                        sanity.Restore(threshold + 1, 0, true);
+                        var earlier = sanity.Stage;
+                        int before = notifications;
+                        sanity.Adjust(-1);
+                        var lower = (SanityStage)(i + 1);
+                        Check(sanity.Stage == lower && notifications == before + 1, $"Sanity {threshold + 1} to {threshold} changes stage exactly once.");
+                        sanity.Adjust(1);
+                        var snapshot = save.Capture();
+                        save.Restore(JsonUtility.FromJson<SaveData>(JsonUtility.ToJson(snapshot)));
+                        Check(sanity.Stage == lower && notifications == before + 1, $"Saving at {threshold + 1} preserves the recovery margin.");
+                        sanity.Adjust(2);
+                        Check(sanity.Stage == earlier && notifications == before + 2, $"Recovering past {threshold} clears that stage.");
+                    }
+                    Check(collapses == 0, "Restoring stages never repeats the first-collapse reward.");
+                }
+                finally { sanity.StageChanged -= CountStage; sanity.FirstCollapse -= CountCollapse; }
+
+                var origin = new Vector2Int(0, 18);
+                for (int x = -12; x <= 12; x++)
+                {
+                    world.Set(origin + new Vector2Int(x, -1), catalog.Find("stone").PlaceableBlock);
+                    for (int y = 0; y < 5; y++) world.Set(origin + new Vector2Int(x, y), null);
+                }
+                var pos = world.Center(origin);
+                player.transform.position = pos;
+                player.GetComponent<Rigidbody2D>().position = pos;
+                world.Map.GetComponent<TilemapCollider2D>().ProcessTilemapChanges();
+                Physics2D.SyncTransforms();
+                var pool = effects.GetComponentsInChildren<SpriteRenderer>(true)
+                    .Where(r => r.name is "Unreal eyes" or "Moving shadow" or "False stone").ToArray();
+                int Visible(string label) => pool.Count(r => r.name == label && r.gameObject.activeSelf);
+                Check(pool.Length == 6 && pool.All(r => !r.GetComponent<Collider2D>() && !r.GetComponent<ItemDrop>()),
+                    "The reusable vision sprites have no colliders or loot.");
+
+                clock.SetHour(12);
+                sanity.Restore(70, 0, true);
+                effects.Tick(31);
+                Check(!effects.EyesVisible && Visible("Moving shadow") == 0, "At 70 sanity the first visions wait for night.");
+                clock.SetHour(0);
+                effects.Tick(31);
+                Check(effects.EyesVisible && Visible("Moving shadow") == 1 && enemies.Actors.Count == 0,
+                    "At night 70 sanity produces eyes and a harmless moving silhouette.");
+                Time.timeScale = 0;
+                effects.Tick(60);
+                Check(effects.EyesVisible, "Pause freezes the active vision.");
+                Time.timeScale = 1;
+                var eye = pool.First(r => r.name == "Unreal eyes" && r.gameObject.activeSelf);
+                player.transform.position = eye.transform.position;
+                effects.Tick(0.1f);
+                Check(!eye.gameObject.activeSelf, "Watching eyes disappear when approached.");
+                player.transform.position = pos;
+
+                var network = world.GetComponent<EnergyNetwork>();
+                var lamp = network.Spawn(catalog.Find("crystal_lamp"), pos + Vector3.right * 3, 6);
+                lamp.Powered = true;
+                bool watchers = false, falseStone = false, pursuit = false, dim = false, recovered = false;
+                sanity.Restore(50, 0, true);
+                for (int i = 0; i < 600; i++)
+                {
+                    effects.Tick(1);
+                    watchers |= Visible("Unreal eyes") >= 2;
+                    falseStone |= Visible("False stone") > 0;
+                }
+                Check(watchers && falseStone && enemies.Actors.Count == 0, "The watched stage adds clusters of eyes and false objects.");
+                sanity.Restore(30, 0, true);
+                for (int i = 0; i < 650; i++)
+                {
+                    effects.Tick(1);
+                    pursuit |= Visible("Moving shadow") > 0 && Visible("Unreal eyes") == 0;
+                    dim |= lamp.IsDimmed;
+                    recovered |= dim && !lamp.IsDimmed;
+                }
+                Check(pursuit && dim && recovered && lamp.Powered && lamp.Stored == 6 && enemies.Actors.Count == 0,
+                    "Pursuit and temporary dimming leave lamp charge and physical safety intact.");
+
+                sanity.Restore(15, 0, true);
+                bool visitor = false, retreat = false;
+                int lastSpawn = -100, alive = 0;
+                for (int i = 0; i < 900; i++)
+                {
+                    effects.Tick(1);
+                    int count = enemies.Actors.Count;
+                    if (count > 1) throw new Exception("Multiple physical manifestations.");
+                    if (count == 1 && alive == 0)
+                    {
+                        if (i - lastSpawn < 70) throw new Exception("Manifestation cooldown bypassed.");
+                        lastSpawn = i;
+                        visitor = true;
+                    }
+                    retreat |= alive == 1 && count == 0;
+                    alive = count;
+                }
+                Check(visitor && retreat, "At 15 sanity one physical shadow can visit, then leaves a recovery window.");
+                sanity.Restore(0, 0, true);
+                effects.Tick(31);
+                Check(Visible("Unreal eyes") == 4 && Visible("Moving shadow") == 1 && player.GetComponent<PlayerVitals>().Health > 0,
+                    "Zero sanity starts a survivable breach.");
+                var camera = Camera.main;
+                Vector3 cameraPosition = camera.transform.position;
+                try
+                {
+                    camera.transform.position = pos + new Vector3(0, 1.5f, -10);
+                    CapturePreview("Logs/Alpha149Breach.png");
+                }
+                finally { camera.transform.position = cameraPosition; }
+                var low = save.Capture();
+                save.Restore(low);
+                save.Restore(low);
+                effects.Tick(1);
+                Check(pool.All(r => !r.gameObject.activeSelf) && enemies.Actors.Count == 0, "Reloading twice clears active events and delays their return.");
+                bool wasPeaceful = enemies.Peaceful;
+                try
+                {
+                    enemies.Peaceful = true;
+                    bool visions = false;
+                    for (int i = 0; i < 360; i++)
+                    {
+                        effects.Tick(1);
+                        visions |= effects.EyesVisible;
+                        if (enemies.Actors.Count > 0) throw new Exception("Physical shadow in a peaceful world.");
+                    }
+                    Check(visions, "Peaceful worlds keep the visions without spawning a physical enemy.");
+                }
+                finally { enemies.Peaceful = wasPeaceful; }
+                sanity.Advance(8, true, false);
+                Check(sanity.Value == 48 && !sanity.CanManifest, "Rest can recover a hero from zero sanity.");
+            }
+            finally
+            {
+                Time.timeScale = 1;
+                save.Restore(original);
+            }
         }
 
         private static void CapturePreview(string path = "Logs/PrototypePreview.png")

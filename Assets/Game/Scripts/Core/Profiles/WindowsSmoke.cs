@@ -109,6 +109,9 @@ namespace BrokenHeart.Core.Profiles
             var copper = inventory.Catalog.Find("copper_ingot");
             inventory.Model.SetSlot(inventory.Model.Capacity - 1, new ItemStack(copper, 4));
             inventory.Select(selected);
+            var mind = inventory.GetComponent<SanitySystem>();
+            mind.Restore(30, 0, false);
+            mind.Adjust(1);
             MoveHero(inventory, FirstPosition);
             var save = world.GetComponent<SaveSystem>();
             Require(FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(true), save.Status);
@@ -122,7 +125,7 @@ namespace BrokenHeart.Core.Profiles
             save = world.GetComponent<SaveSystem>();
             Require(save.Status == "Save loaded" && world.Store.Get(cell) == block &&
                 inventory.Model.Count(inventory.Catalog.Find("copper_ingot")) == 0 &&
-                inventory.Model.Capacity == inventory.BaseCapacity &&
+                inventory.Model.Capacity == inventory.BaseCapacity && inventory.GetComponent<SanitySystem>().Stage == SanityStage.Calm &&
                 Mathf.Approximately(inventory.transform.position.x, 0.5f),
                 "A new hero must see the world edit and receive an independent inventory and spawn.");
             // Reload within one frame so simulation cannot advance the furnace or consume charge before inspection.
@@ -160,6 +163,8 @@ namespace BrokenHeart.Core.Profiles
             Require(FindAnyObjectByType<SaveSystem>().Status == "Save loaded" &&
                 FindAnyObjectByType<BlockWorld>().Store.Get(cell) == block && inventory.SelectedIndex == selected &&
                 Mathf.Approximately(inventory.transform.position.x, FirstPosition.x) &&
+                inventory.GetComponent<SanitySystem>().Stage == SanityStage.Pursued &&
+                Mathf.Approximately(inventory.GetComponent<SanitySystem>().Value, 31) &&
                 inventory.Equipped(backpackSlot).Item == inventory.Catalog.Find("trail_backpack") &&
                 overflowSlot.Item == inventory.Catalog.Find("copper_ingot") && overflowSlot.Count == 4 &&
                 inventory.Model.Count(inventory.Catalog.Find("iron_ingot")) == 0,

@@ -1,6 +1,6 @@
 # Broken Heart
 
-**Alpha 1.48**
+**Alpha 1.49**
 
 A 2D survival and crafting game built with Unity. Explore forests and caves, gather materials, and build a workshop to craft tools and smelt ore.
 
@@ -10,6 +10,6 @@ Open the repository folder as a project in Unity Hub using Unity 6000.6.9f1. Ope
 
 Use A and D to move, Space to jump, E or Tab to open the inventory, and M to open the map. Use the mouse wheel to cycle through the hotbar.
 
-The game saves every two minutes of play, after a full rest, and when you return to the menu. F5 saves manually and F9 reloads the last save. Monster encounters and terrain shadows are paused in this alpha.
+The game saves every two minutes of play, after a full rest, and when you return to the menu. F5 saves manually and F9 reloads the last save. At night, eyes and silhouettes first appear at 70 sanity. At 30, a nearby powered lamp can dim temporarily. At 15 or below, a shadow can take physical form outside peaceful worlds. Press H on safe ground to rest and recover sanity.
 
 [Project notes](Assets/Game/README.md)
