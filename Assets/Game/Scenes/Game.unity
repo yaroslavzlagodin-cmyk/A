@@ -51412,6 +51412,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 615ec53752746444dbe7a5a43cea8991, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Systems.SanityVisuals
+  hallucinationsEnabled: 1
+  manifestation: {fileID: 11400000, guid: 8045515b5a3444b492a2bf790cef5673, type: 2}
   sanity: {fileID: 1069310866}
   observer: {fileID: 1069310857}
   world: {fileID: 796762970}

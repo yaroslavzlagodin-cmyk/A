@@ -60,11 +60,13 @@ namespace BrokenHeart.Combat
 
         private void Update()
         {
-            if (!EncountersActive || Time.timeScale == 0) return;
-            spawnIn -= Time.deltaTime;
-            attackIn -= Time.deltaTime;
-            if (inventory.CanUseAttackKey && Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) TryAttack(Vector2.zero);
+            if (Time.timeScale == 0) return;
+            attackIn = Mathf.Max(0, attackIn - Time.deltaTime);
             AnimateSwing();
+            if (!EncountersActive && actors.Count == 0) return;
+            if (inventory.CanUseAttackKey && Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) TryAttack(Vector2.zero);
+            if (!EncountersActive) return;
+            spawnIn -= Time.deltaTime;
             if(spawnIn>0)return;
             spawnIn=12+random.Next(8);
             if (!clock.IsNight)
@@ -98,7 +100,7 @@ namespace BrokenHeart.Combat
 
         public bool TryAttack(Vector2 aim)
         {
-            if (!EncountersActive || Time.timeScale == 0 || attackIn > 0 || motor.InputSuppressed ||
+            if ((!EncountersActive && actors.Count == 0) || Time.timeScale == 0 || attackIn > 0 || motor.InputSuppressed ||
                 inventory.Mode != PlayerInputMode.Gameplay)
                 return false;
             var item = inventory.Selected.Item;
@@ -147,7 +149,7 @@ namespace BrokenHeart.Combat
             if (energy == null) return found;
             foreach (var device in energy.Devices)
             {
-                if (!device.Powered || device.Data.consumptionPerSecond <= 0) continue;
+                if (!device.Powered || device.IsDimmed || device.Data.consumptionPerSecond <= 0) continue;
                 Vector2 source = device.transform.position;
                 float distance = (source - position).sqrMagnitude;
                 if (distance >= nearest || !HasSight(position, source)) continue;
@@ -171,7 +173,19 @@ namespace BrokenHeart.Combat
         }
         public EnemyActor Spawn(EnemyData data,Vector2 position)
         {
-            if (!EncountersActive || actors.Count >= 6) return null;
+            if (!EncountersActive) return null;
+            return CreateActor(data, position);
+        }
+
+        internal EnemyActor Manifest(EnemyData data, Vector2 position, SanitySystem sanity)
+        {
+            if (!isActiveAndEnabled || Peaceful || !sanity.CanManifest) return null;
+            return CreateActor(data, position);
+        }
+
+        private EnemyActor CreateActor(EnemyData data, Vector2 position)
+        {
+            if (data == null || actors.Count >= 6) return null;
             var go=new GameObject(data.name,typeof(SpriteRenderer),typeof(Rigidbody2D),typeof(BoxCollider2D)); go.layer=2; go.transform.position=position;
             var visual=go.GetComponent<SpriteRenderer>(); visual.sprite=data.sprite; visual.sharedMaterial=material; visual.sortingOrder=9;
             var body=go.GetComponent<Rigidbody2D>(); body.gravityScale=2; body.constraints=RigidbodyConstraints2D.FreezeRotation;

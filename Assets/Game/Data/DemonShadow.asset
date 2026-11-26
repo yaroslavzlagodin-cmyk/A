@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d432f7220b293d24e85b919e57bcf97f, type: 3}
+  m_Name: DemonShadow
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Combat.EnemyData
+  biome: forest
+  underground: 0
+  speed: 2
+  health: 22
+  damageKind: 0
+  sanityDamage: 2
+  damage: 6
+  windup: 0.85
+  recovery: 3
+  sightRange: 16
+  sprite: {fileID: 4093480436322176185, guid: 0ef4066ca140e6f40b4277228722b7e3, type: 3}
+  drop: {fileID: 0}

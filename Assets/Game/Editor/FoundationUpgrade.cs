@@ -29,6 +29,7 @@ namespace BrokenHeart.Editor
             Set(sleep,"vitals",inventory.GetComponent<PlayerVitals>());Set(sleep,"enemies",world.GetComponent<EnemySystem>());
             Set(sleep,"memory",inventory.GetComponent<MemorySystem>());Set(sleep,"mindFocus",inventory.Catalog.Find("crystal_focus"));
             var effects=GetOrAdd<SanityVisuals>(world.gameObject);Set(effects,"sanity",sanity);Set(effects,"observer",inventory.transform);Set(effects,"world",world);
+            Set(effects,"manifestation",AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/Game/Data/DemonShadow.asset"));
             Set(effects,"eyeSprite",MakeIcon("UnrealEyes",new Color(0.9f,0.8f,0.65f),5));
             Set(effects,"shadowSprite",MakeIcon("Shadow",new Color(0.15f,0.10f,0.2f),4));
             Set(effects,"material",AssetDatabase.LoadAssetAtPath<Material>("Assets/Game/Materials/PixelUnlit.mat"));
