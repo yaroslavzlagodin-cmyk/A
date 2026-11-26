@@ -39,6 +39,7 @@ namespace BrokenHeart.Systems
         public WeatherKind weather;
         public float sanity = 100, awakeSeconds;
         public bool collapsed;
+        public int sanityStage;
         internal SaveData Copy() => (SaveData)MemberwiseClone();
     }
     public sealed class SaveSystem : MonoBehaviour
@@ -104,6 +105,7 @@ namespace BrokenHeart.Systems
             weather = world.GetComponent<WorldWeather>() != null ? world.GetComponent<WorldWeather>().Current : WeatherKind.Clear,
             health = inventory.GetComponent<PlayerVitals>() != null ? inventory.GetComponent<PlayerVitals>().Health : 100,
             sanity = inventory.GetComponent<SanitySystem>() != null ? inventory.GetComponent<SanitySystem>().Value : 100,
+            sanityStage = inventory.TryGetComponent<SanitySystem>(out var mind) ? (int)mind.Stage + 1 : 0,
             awakeSeconds = inventory.GetComponent<SanitySystem>() != null ? inventory.GetComponent<SanitySystem>().AwakeSeconds : 0,
             collapsed = inventory.GetComponent<SanitySystem>() != null && inventory.GetComponent<SanitySystem>().HasReachedZero,
             devices = world.GetComponent<EnergyNetwork>()?.Devices.Select(d => new SavedDevice {
@@ -202,7 +204,7 @@ namespace BrokenHeart.Systems
             bool legacy = capacity == inventory.BaseCapacity && capacity >= 27 && (oldCount == 24 || oldCount == 27);
             if (oldCount != capacity && !legacy) throw new InvalidDataException("Invalid inventory slot count.");
             var slots = new ItemStack[capacity];
-            if (!float.IsFinite(data.sanity) || data.sanity < 0 || data.sanity > 100 || !float.IsFinite(data.awakeSeconds) || data.awakeSeconds < 0)
+            if (data.sanityStage < 0 || data.sanityStage > 6 || !float.IsFinite(data.sanity) || data.sanity < 0 || data.sanity > 100 || !float.IsFinite(data.awakeSeconds) || data.awakeSeconds < 0)
                 throw new InvalidDataException("Invalid sanity state.");
             if (!float.IsFinite(data.elapsed) || data.elapsed < 0 || !float.IsFinite(data.health) || data.health < 1 || data.health > 100 ||
                 (int)data.weather < 0 || (int)data.weather > 3) throw new InvalidDataException("Invalid world clock or health.");
@@ -239,7 +241,7 @@ namespace BrokenHeart.Systems
             inventory.Progress.Restore(data.experience);
             inventory.Select(data.selected);
             inventory.GetComponent<SleepSystem>()?.CancelRest();
-            inventory.GetComponent<SanitySystem>()?.Restore(data.sanity,data.awakeSeconds,data.collapsed);
+            inventory.GetComponent<SanitySystem>()?.Restore(data.sanity,data.awakeSeconds,data.collapsed,data.sanityStage);
             world.GetComponent<EnemySystem>()?.Clear();
             inventory.GetComponent<PlayerVitals>()?.Restore(data.health);
             world.GetComponent<DayNightSystem>()?.Restore(data.elapsed);

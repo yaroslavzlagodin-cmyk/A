@@ -39,6 +39,7 @@ namespace BrokenHeart.Core.Profiles
                 character.sanity = data.sanity;
                 character.awakeSeconds = data.awakeSeconds;
                 character.collapsed = data.collapsed;
+                character.sanityStage = data.sanityStage;
                 character.dead = Character.dead;
 
                 var journey = library.journeys.Find(j => j.worldId == World.id && j.characterId == character.id);
@@ -79,6 +80,7 @@ namespace BrokenHeart.Core.Profiles
                 data.sanity = character.sanity;
                 data.awakeSeconds = character.awakeSeconds;
                 data.collapsed = character.collapsed;
+                data.sanityStage = character.sanityStage;
                 data.position = library.journeys.Find(j => j.worldId == World.id && j.characterId == character.id)?.position
                     ?? new Vector3(0.5f, 4, 0);
 

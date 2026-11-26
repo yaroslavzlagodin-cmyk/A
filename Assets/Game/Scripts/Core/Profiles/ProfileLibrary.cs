@@ -37,6 +37,7 @@ namespace BrokenHeart.Core.Profiles
         public int selected;
         public float health=100,sanity=100,awakeSeconds;
         public bool collapsed;
+        public int sanityStage;
     }
     [Serializable] public sealed class JourneyPosition { public string worldId,characterId; public Vector3 position; }
     [Serializable] public sealed class LibraryData
