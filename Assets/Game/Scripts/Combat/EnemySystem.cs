@@ -20,6 +20,8 @@ namespace BrokenHeart.Combat
         private System.Random random;
         private PlayerInventory inventory;
         private PlayerMotor motor;
+        private BrokenHeart.Systems.Energy.EnergyNetwork energy;
+        private int solidMask;
         private SpriteRenderer playerSprite;
         private SpriteRenderer weaponSwing;
         private Vector2 swingDirection;
@@ -36,6 +38,8 @@ namespace BrokenHeart.Combat
             random = new System.Random(world.Seed ^ 8221);
             inventory = player.GetComponent<PlayerInventory>();
             motor = player.GetComponent<PlayerMotor>();
+            energy = GetComponent<BrokenHeart.Systems.Energy.EnergyNetwork>();
+            solidMask = 1 << world.Map.gameObject.layer;
             playerSprite = player.GetComponent<SpriteRenderer>();
             var visual = new GameObject("Weapon Swing", typeof(SpriteRenderer));
             visual.transform.SetParent(player.transform, false);
@@ -59,7 +63,7 @@ namespace BrokenHeart.Combat
             if (!EncountersActive || Time.timeScale == 0) return;
             spawnIn -= Time.deltaTime;
             attackIn -= Time.deltaTime;
-            if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) TryAttack(Vector2.zero);
+            if (inventory.CanUseAttackKey && Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) TryAttack(Vector2.zero);
             AnimateSwing();
             if(spawnIn>0)return;
             spawnIn=12+random.Next(8);
@@ -95,7 +99,7 @@ namespace BrokenHeart.Combat
         public bool TryAttack(Vector2 aim)
         {
             if (!EncountersActive || Time.timeScale == 0 || attackIn > 0 || motor.InputSuppressed ||
-                inventory.IsOpen || inventory.IsMapOpen)
+                inventory.Mode != PlayerInputMode.Gameplay)
                 return false;
             var item = inventory.Selected.Item;
             bool armed = item != null && item.AttackDamage > 0;
@@ -111,7 +115,7 @@ namespace BrokenHeart.Combat
                 Vector2 delta = (Vector2)actor.transform.position - origin;
                 float distance = delta.sqrMagnitude;
                 if (distance > closest || (aim != Vector2.zero && Vector2.Dot(aim, delta.normalized) < 0.5f) ||
-                    Physics2D.Linecast(origin, origin + delta, 1)) continue;
+                    !HasSight(origin, origin + delta)) continue;
                 target = actor;
                 closest = distance;
                 hitDirection = delta.normalized;
@@ -127,6 +131,31 @@ namespace BrokenHeart.Combat
             }
             if (target != null) target.Damage(damage);
             return true;
+        }
+
+        internal bool HasSight(Vector2 from, Vector2 to) => !Physics2D.Linecast(from, to, solidMask);
+
+        internal bool FindStrongLight(Vector2 position, float radius, out float lightX)
+        {
+            Vector2 hero = player.transform.position;
+            lightX = hero.x;
+            if (clock.SurfaceIntensity >= 0.7f && world.DepthAt(world.CellAt(position)) <= 1) return true;
+            float nearest = radius * radius;
+            bool found = !inventory.Equipped((int)EquipmentSlot.Lamp - 1).Empty &&
+                (hero - position).sqrMagnitude < nearest && HasSight(position, hero);
+            if (found) nearest = (hero - position).sqrMagnitude;
+            if (energy == null) return found;
+            foreach (var device in energy.Devices)
+            {
+                if (!device.Powered || device.Data.consumptionPerSecond <= 0) continue;
+                Vector2 source = device.transform.position;
+                float distance = (source - position).sqrMagnitude;
+                if (distance >= nearest || !HasSight(position, source)) continue;
+                nearest = distance;
+                lightX = source.x;
+                found = true;
+            }
+            return found;
         }
 
         private void AnimateSwing()

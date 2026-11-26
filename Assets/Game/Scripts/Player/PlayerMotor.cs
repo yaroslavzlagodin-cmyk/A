@@ -38,7 +38,7 @@ namespace BrokenHeart.Player
         }
         private void Update()
         {
-            if(InputSuppressed || inventory != null && inventory.IsMapOpen){move=0;jumpBuffer=0;return;}
+            if(InputSuppressed || inventory != null && inventory.Mode != PlayerInputMode.Gameplay){move=0;jumpBuffer=0;return;}
             var keyboard = Keyboard.current;
             move = keyboard == null ? 0 :
                 ((keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) ? 1 : 0) -

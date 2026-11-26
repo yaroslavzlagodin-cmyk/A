@@ -16,6 +16,13 @@ namespace BrokenHeart.Inventory
     {
         private ItemStack[] slots;
         public event Action Changed;
+        public long Revision { get; private set; }
+        private void MarkChanged()
+        {
+            Revision++;
+            Changed?.Invoke();
+        }
+
         public int Capacity => slots.Length;
         public ItemStack this[int index] => slots[index];
         public InventoryModel(int capacity)
@@ -43,7 +50,7 @@ namespace BrokenHeart.Inventory
         {
             if (item == null || amount < 0) throw new ArgumentException("Invalid item or amount.");
             int remaining = Insert(item, amount, 0, Capacity);
-            if (remaining != amount) Changed?.Invoke();
+            if (remaining != amount) MarkChanged();
             return remaining;
         }
 
@@ -65,7 +72,7 @@ namespace BrokenHeart.Inventory
         {
             if (index < 0 || index >= Capacity || amount <= 0 || slots[index].Count < amount) return false;
             slots[index] = new ItemStack(slots[index].Item, slots[index].Count - amount);
-            Changed?.Invoke();
+            MarkChanged();
             return true;
         }
         public bool Remove(ItemData item, int amount)
@@ -78,7 +85,7 @@ namespace BrokenHeart.Inventory
                 slots[i] = new ItemStack(item, slots[i].Count - take);
                 amount -= take;
             }
-            Changed?.Invoke();
+            MarkChanged();
             return true;
         }
         public bool Move(int from, int to, int amount = int.MaxValue) => MoveTo(from, this, to, amount, true);
@@ -102,8 +109,8 @@ namespace BrokenHeart.Inventory
                 destination.slots[to] = new ItemStack(source.Item, target.Count + count);
                 slots[from] = new ItemStack(source.Item, source.Count - count);
             }
-            Changed?.Invoke();
-            if (destination != this) destination.Changed?.Invoke();
+            MarkChanged();
+            if (destination != this) destination.MarkChanged();
             return true;
         }
 
@@ -120,7 +127,7 @@ namespace BrokenHeart.Inventory
             if (index < 0 || index >= Capacity || firstSlot < 0 || firstSlot >= endSlot || endSlot > Capacity ||
                 (index >= firstSlot && index < endSlot)) return 0;
             int moved = TransferIntoFreeSpace(index, this, firstSlot, endSlot);
-            if (moved > 0) Changed?.Invoke();
+            if (moved > 0) MarkChanged();
             return moved;
         }
 
@@ -150,8 +157,8 @@ namespace BrokenHeart.Inventory
         private void NotifyTransfer(InventoryModel destination, int moved)
         {
             if (moved == 0) return;
-            Changed?.Invoke();
-            destination.Changed?.Invoke();
+            MarkChanged();
+            destination.MarkChanged();
         }
 
         public void SortFrom(int firstSlot)
@@ -176,7 +183,7 @@ namespace BrokenHeart.Inventory
                 }
                 if (remaining > 0) slots[next++] = new ItemStack(stack.Item, remaining);
             }
-            Changed?.Invoke();
+            MarkChanged();
         }
 
         private static int CompareItems(ItemStack left, ItemStack right)
@@ -199,16 +206,21 @@ namespace BrokenHeart.Inventory
             foreach (var slot in restored)
                 if (slot.Count < 0 || (!slot.Empty && slot.Count > slot.Item.MaxStack)) throw new ArgumentException("Invalid stack.");
             Array.Copy(restored, slots, Capacity);
-            Changed?.Invoke();
+            MarkChanged();
         }
         public void ReplaceWith(InventoryModel other)
         {
             if (other.Capacity != Capacity) throw new ArgumentException("Inventory capacity differs.");
             Array.Copy(other.slots, slots, Capacity);
-            Changed?.Invoke();
+            MarkChanged();
         }
 
-        internal void SetSlot(int index, ItemStack stack) => slots[index] = stack;
+        internal void SetSlot(int index, ItemStack stack)
+        {
+            if (!stack.Empty && stack.Count > stack.Item.MaxStack) throw new ArgumentOutOfRangeException(nameof(stack));
+            slots[index] = stack;
+            MarkChanged();
+        }
         internal bool TryResize(int capacity)
         {
             for (int i = capacity; i < Capacity; i++)
@@ -219,7 +231,7 @@ namespace BrokenHeart.Inventory
         internal void ApplyLoadout(InventoryModel other)
         {
             slots = (ItemStack[])other.slots.Clone();
-            Changed?.Invoke();
+            MarkChanged();
         }
     }
 }

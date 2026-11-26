@@ -1,6 +1,6 @@
 # Broken Heart
 
-**Alpha 1.47**
+**Alpha 1.48**
 
 A 2D survival and crafting game built with Unity. Explore forests and caves, gather materials, and build a workshop to craft tools and smelt ore.
 

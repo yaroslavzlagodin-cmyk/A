@@ -16,6 +16,9 @@ namespace BrokenHeart.Crafting
         [SerializeField] private ItemData output;
         [SerializeField, Min(1)] private int outputCount = 1;
         [SerializeField] private bool byHand;
+        // Recipe assets can be edited while the editor is running.
+        internal static long DefinitionRevision { get; private set; }
+        private void OnValidate() => DefinitionRevision++;
         public string Id => id;
         public RecipeCategory Category => category;
         public Ingredient[] Ingredients => ingredients;

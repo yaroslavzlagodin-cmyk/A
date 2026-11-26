@@ -20,14 +20,22 @@ namespace BrokenHeart.Systems
         private float restSeconds;
         private void OnEnable(){vitals.Damaged+=OnDamaged; sanity.FirstCollapse+=OnCollapse;}
         private void OnDisable(){vitals.Damaged-=OnDamaged; sanity.FirstCollapse-=OnCollapse; CancelRest();}
-        private void OnDamaged(float damage){CancelRest(); sanity.Adjust(-damage*0.5f);}
+        private void OnDamaged(float damage){CancelRest();}
         private void OnCollapse(){memory.UnlockMindProtection();}
         public bool TryRest()
         {
+            if (inventory.Mode != PlayerInputMode.Gameplay) return false;
             if(!motor.Grounded || enemies.Nearby(8)) { Status="Cannot rest: find safe ground"; return false; }
+            inventory.CaptureHeldActions();
             Resting=true; restSeconds=0; motor.InputSuppressed=true; Status="Resting... movement cancels"; return true;
         }
-        public void CancelRest(){Resting=false; if(motor!=null)motor.InputSuppressed=false;}
+        public void CancelRest()
+        {
+            if (!Resting) return;
+            inventory.CaptureHeldActions();
+            Resting = false;
+            motor.InputSuppressed = Time.timeScale == 0;
+        }
         private void Update()
         {
             if(Time.timeScale==0)return;

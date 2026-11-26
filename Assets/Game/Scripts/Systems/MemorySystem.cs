@@ -17,6 +17,7 @@ namespace BrokenHeart.Systems
         public IEnumerable<string> Unlocked => unlocked;
         public IEnumerable<string> StudyItems => studyItems;
         public IEnumerable<string> KnownMaterials => knownMaterials;
+        public long RecipeRevision { get; private set; }
         public string Notification { get; private set; }
         private float notificationUntil;
         public string ActiveNotification => Time.time < notificationUntil ? Notification : "";
@@ -47,7 +48,7 @@ namespace BrokenHeart.Systems
 
         private void Remember(ItemStack stack)
         {
-            if (!stack.Empty) knownMaterials.Add(stack.Item.Id);
+            if (!stack.Empty && knownMaterials.Add(stack.Item.Id)) RecipeRevision++;
         }
 
         private void OnPickup(ItemData item, int amount)
@@ -91,6 +92,7 @@ namespace BrokenHeart.Systems
         private void Learn(RecipeData recipe)
         {
             if (!unlocked.Add(recipe.Id)) return;
+            RecipeRevision++;
             inventory.Progress.Gain(10);
             Notify("Memory restored: " + recipe.Output.DisplayName);
         }
@@ -103,6 +105,7 @@ namespace BrokenHeart.Systems
 
         public void Restore(IEnumerable<string> ids, IEnumerable<string> pendingStudy = null, IEnumerable<string> materials = null)
         {
+            RecipeRevision++;
             unlocked.Clear();
             foreach (string id in ids) unlocked.Add(id);
             knownMaterials.Clear();

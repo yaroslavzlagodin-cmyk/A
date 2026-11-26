@@ -16,6 +16,8 @@ MonoBehaviour:
   underground: 0
   speed: 2
   health: 30
+  damageKind: 1
+  sanityDamage: 8
   damage: 8
   sprite: {fileID: -7841129473042487007, guid: 590b90084bb414746b22647657a2e53b, type: 3}
   drop: {fileID: 11400000, guid: 4126b96d91b7db947b667a3369f8b11f, type: 2}

@@ -21,16 +21,7 @@ namespace BrokenHeart.UI
         private const int SlotPitch = 58;
         private const int RowPitch = 52;
         private const int SlotSize = 49;
-        private enum SlotKind { Bag, Equipment, Station }
-        private readonly struct SlotTarget
-        {
-            public readonly int Index;
-            public readonly SlotKind Kind;
-            public bool Equipment => Kind == SlotKind.Equipment;
-            public bool Station => Kind == SlotKind.Station;
-            public SlotTarget(int index, SlotKind kind = SlotKind.Bag) { Index = index; Kind = kind; }
-            public bool Matches(SlotTarget other) => Index == other.Index && Kind == other.Kind;
-        }
+        private InventorySlotActions slots;
         private SlotTarget? hover, drag;
         private bool split;
         private float storageScroll, recipeScroll;
@@ -89,6 +80,7 @@ namespace BrokenHeart.UI
         private void Start()
         {
             if (inventory == null) return;
+            slots = new InventorySlotActions(inventory, stations);
             portrait = inventory.GetComponent<SpriteRenderer>();
             worldHud = GetComponent<WorldStatusHud>();
             foreach (var item in inventory.Catalog.Items)
@@ -242,14 +234,7 @@ namespace BrokenHeart.UI
 
         private void RefreshRecipes()
         {
-            visibleRecipes.Clear();
-            if (crafting != null && memory != null)
-            {
-                foreach (var recipe in crafting.Recipes)
-                    if (crafting.AvailableHere(recipe) && memory.CanView(recipe) && recipe.Output != null &&
-                        (!category.HasValue || category.Value == recipe.Category))
-                        visibleRecipes.Add(recipe);
-            }
+            if (crafting != null) crafting.ListVisible(category, visibleRecipes);
             if (!visibleRecipes.Contains(selectedRecipe))
                 selectedRecipe = visibleRecipes.Count > 0 ? visibleRecipes[0] : null;
         }
@@ -389,9 +374,9 @@ namespace BrokenHeart.UI
             bool over = interactive && rect.Contains(Event.current.mousePosition);
             if (over) hover = target;
             bool active = target.Kind == SlotKind.Bag && target.Index == inventory.SelectedIndex;
-            bool validGear = target.Equipment && drag.HasValue && StackAt(drag.Value).Item != null &&
-                StackAt(drag.Value).Item.EquipmentSlot == PlayerInventory.SlotType(target.Index);
-            var stack = StackAt(target);
+            bool validGear = target.Equipment && drag.HasValue && slots.StackAt(drag.Value).Item != null &&
+                slots.StackAt(drag.Value).Item.EquipmentSlot == PlayerInventory.SlotType(target.Index);
+            var stack = slots.StackAt(target);
             Plate(rect, active ? Gold : validGear ? Mint : over ? Soft : Line, Ink);
             MenuSkin.Fill(At(rect, 2, 2, rect.width - 4, 1), Line);
             if (stack.Empty)
@@ -403,20 +388,13 @@ namespace BrokenHeart.UI
             if (stack.Count > 1) Label(At(rect, 2, rect.height - 17, rect.width - 6, 15), stack.Count.ToString(), 11, Text, TextAnchor.LowerRight, true);
         }
 
-        private ItemStack StackAt(SlotTarget target)
-        {
-            if (target.Equipment) return inventory.Equipped(target.Index);
-            var model = target.Station ? stations?.OpenStation?.Contents : inventory.Model;
-            return model != null && target.Index < model.Capacity ? model[target.Index] : default;
-        }
-
         private void HandleSlotInput()
         {
             var evt = Event.current;
             if (HandleQuickTransfer(evt)) return;
             if (evt.type == EventType.MouseDown && hover is SlotTarget source && (evt.button == 0 || evt.button == 1))
             {
-                var stack = StackAt(source);
+                var stack = slots.StackAt(source);
                 if (inventory.IsOpen && !source.Station && evt.button == 0 && evt.shift && !stack.Empty && memory != null && memory.Study(stack.Item))
                 {
                     drag = null;
@@ -425,12 +403,18 @@ namespace BrokenHeart.UI
                     evt.Use();
                     return;
                 }
-                if (source.Kind == SlotKind.Bag && source.Index < inventory.HotbarSize) inventory.Select(source.Index);
+                slots.Select(source);
                 if (inventory.IsOpen && !stack.Empty) { drag = source; split = evt.button == 1; }
                 evt.Use();
             }
             if (evt.rawType != EventType.MouseUp || !drag.HasValue || evt.button != (split ? 1 : 0)) return;
-            if (hover is SlotTarget destination && !destination.Matches(drag.Value)) MoveStack(drag.Value, destination);
+            if (hover is SlotTarget destination && !destination.Matches(drag.Value) &&
+                !slots.MoveStack(drag.Value, destination, split) && drag.Value.Equipment && destination.Kind == SlotKind.Bag &&
+                PlayerInventory.SlotType(drag.Value.Index) == EquipmentSlot.Backpack)
+            {
+                inventoryNotice = "Free the last row and move the backpack to an empty slot";
+                noticeUntil = Time.unscaledTime + 3;
+            }
             drag = null;
             if (evt.type == EventType.MouseUp) evt.Use();
         }
@@ -493,9 +477,7 @@ namespace BrokenHeart.UI
         private void TransferSweptSlot(SlotTarget target)
         {
             if (!sweptSlots.Add(target.Index)) return;
-            if (target.Equipment) inventory.QuickUnequip(target.Index);
-            else if (stations?.OpenStation?.Contents != null) stations.QuickTransfer(target.Station, target.Index);
-            else if (!target.Station) inventory.QuickTransfer(target.Index);
+            slots.QuickTransfer(target);
         }
 
         private void EndSweep()
@@ -504,39 +486,14 @@ namespace BrokenHeart.UI
             sweptSlots.Clear();
         }
 
-        private void MoveStack(SlotTarget source, SlotTarget destination)
-        {
-            if (source.Station || destination.Station)
-            {
-                if (source.Equipment || destination.Equipment) return;
-                stations?.Transfer(source.Station, source.Index, destination.Station, destination.Index,
-                    split ? Mathf.CeilToInt(StackAt(source).Count / 2f) : int.MaxValue);
-            }
-            else if (source.Equipment && destination.Equipment)
-                inventory.MoveEquipped(source.Index, destination.Index);
-            else if (!source.Equipment && destination.Equipment)
-                inventory.Equip(source.Index, destination.Index);
-            else if (source.Equipment)
-            {
-                if (!inventory.Unequip(source.Index, destination.Index) &&
-                    PlayerInventory.SlotType(source.Index) == EquipmentSlot.Backpack)
-                {
-                    inventoryNotice = "Free the last row and move the backpack to an empty slot";
-                    noticeUntil = Time.unscaledTime + 3;
-                }
-            }
-            else inventory.Model.Move(source.Index, destination.Index,
-                split ? Mathf.CeilToInt(StackAt(source).Count / 2f) : int.MaxValue);
-        }
-
         private void DrawPointerDetails()
         {
             Vector2 pointer = Event.current.mousePosition;
-            if (drag is SlotTarget source && !StackAt(source).Empty)
-                Icon(new Rect(pointer.x - 15, pointer.y - 15, 30, 30), StackAt(source).Item.Icon);
+            if (drag is SlotTarget source && !slots.StackAt(source).Empty)
+                Icon(new Rect(pointer.x - 15, pointer.y - 15, 30, 30), slots.StackAt(source).Item.Icon);
             else if (hover is SlotTarget slot && inventory.IsOpen)
             {
-                var stack = StackAt(slot);
+                var stack = slots.StackAt(slot);
                 string name = !stack.Empty ? stack.Item.DisplayName
                     : slot.Equipment ? SlotNames[(int)PlayerInventory.SlotType(slot.Index) - 1] : "";
                 if (name.Length > 0)

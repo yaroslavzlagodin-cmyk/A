@@ -42,6 +42,7 @@ namespace BrokenHeart.Editor
         private static Vector2 dropPosition, originalPlayerPosition;
         private static Vector2Int streamedFloor;
         private static bool running;
+        private static InputSettings.EditorInputBehaviorInPlayMode previousRouting;
 
         static PrototypeChecks()
         {
@@ -86,7 +87,16 @@ namespace BrokenHeart.Editor
                 }
                 catch (Exception error) { File.WriteAllText(ReportPath, "FAIL: " + error); Debug.LogException(error); }
             }
-            if (!running || !EditorApplication.isPlaying || step < 0 || Time.time < nextStep) return;
+        }
+
+        private static void RunStep()
+        {
+            // Sample the same device state as the game. Editor updates use a separate input buffer.
+            if (InputState.currentUpdateType != InputUpdateType.Dynamic || !running ||
+                !EditorApplication.isPlaying || step < 0) return;
+            keyboard.MakeCurrent();
+            mouse.MakeCurrent();
+            if (Time.time < nextStep) return;
             try { Tick(); }
             catch (Exception error) { results.Add("FAIL: " + error); Finish(); }
         }
@@ -147,6 +157,9 @@ namespace BrokenHeart.Editor
                 results.Clear();
                 results.Add(SessionState.GetString("BrokenHeart.Results", ""));
                 running = true;
+                previousRouting = InputSystem.settings.editorInputBehaviorInPlayMode;
+                InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+                InputSystem.onAfterUpdate += RunStep;
                 Application.runInBackground = true;
                 player = Object.FindAnyObjectByType<PlayerMotor>();
                 keyboard = InputSystem.AddDevice<Keyboard>();
@@ -176,26 +189,30 @@ namespace BrokenHeart.Editor
             {
                 Check(player != null && player.Grounded, "Player falls and lands on Tilemap ground.");
                 var inventory=player.GetComponent<PlayerInventory>();
+                if (typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView") is Type gameView)
+                    EditorWindow.GetWindow(gameView).Focus();
                 expectedAutoPickup=inventory.Model.Count(inventory.Catalog.Find("grass"))+1;
                 Object.FindAnyObjectByType<DropSpawner>().Spawn(inventory.Catalog.Find("grass"),1,player.transform.position+Vector3.right*2,player.GetComponent<Collider2D>());
                 startX = player.transform.position.x;
-                InputSystem.QueueDeltaStateEvent(mouse.scroll, Vector2.up);
-                InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.D));
+                InputState.Change(mouse.scroll, Vector2.up);
+                InputState.Change(keyboard, new KeyboardState(Key.D));
                 nextStep = Time.time + 0.6;
                 step++;
             }
             else if (step == 1)
             {
-                Check(player.transform.position.x > startX + 1, "D input moves Rigidbody2D right.");
+                Check(player.transform.position.x > startX + 1,
+                    $"D input moves Rigidbody2D right (x {startX:F2} -> {player.transform.position.x:F2}, " +
+                    $"mode {player.GetComponent<PlayerInventory>().Mode}, key {keyboard.dKey.isPressed}, focus {Application.isFocused}).");
                 var inventory=player.GetComponent<PlayerInventory>();
-                Check(inventory.SelectedIndex == inventory.HotbarSize - 1, "Scrolling up wraps from hotbar slot 1 to slot 9.");
+                Check(inventory.SelectedIndex == inventory.HotbarSize - 1, $"Scrolling up wraps from slot 1 to slot 9 (selected {inventory.SelectedIndex + 1}).");
                 Check(inventory.Model.Count(inventory.Catalog.Find("grass"))==expectedAutoPickup,"Walking over a drop triggers automatic physical pickup.");
                 startY = player.transform.position.y;
                 var world = Object.FindAnyObjectByType<BlockWorld>();
                 ledgeX = world.CellAt(player.transform.position).x + 2;
                 SetTestLedge(world, inventory.Catalog.Find("stone").PlaceableBlock);
-                InputSystem.QueueDeltaStateEvent(mouse.scroll, Vector2.down);
-                InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.D, Key.Space));
+                InputState.Change(mouse.scroll, Vector2.down);
+                InputState.Change(keyboard, new KeyboardState(Key.D, Key.Space));
                 nextStep = Time.time + 0.18;
                 step++;
             }
@@ -203,7 +220,7 @@ namespace BrokenHeart.Editor
             {
                 Check(player.GetComponent<PlayerInventory>().SelectedIndex == 0, "Scrolling down wraps back to hotbar slot 1.");
                 Check(player.transform.position.y > startY + 0.3f, "Space input jumps from ground.");
-                InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.D));
+                InputState.Change(keyboard, new KeyboardState(Key.D));
                 nextStep = Time.time + 0.45;
                 step++;
             }
@@ -211,10 +228,10 @@ namespace BrokenHeart.Editor
             {
                 Check(player.Grounded && Mathf.Abs(player.transform.position.y - startY - 2) < 0.08f,
                     "Player lands on a two-block ledge using the normal jump.");
-                InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+                InputState.Change(keyboard, new KeyboardState());
                 SetTestLedge(Object.FindAnyObjectByType<BlockWorld>(), null);
                 player.GetComponent<PlayerInventory>().SetMapOpen(true);
-                InputSystem.QueueDeltaStateEvent(mouse.scroll, Vector2.up);
+                InputState.Change(mouse.scroll, Vector2.up);
                 nextStep = Time.time + 0.8;
                 step++;
             }
@@ -316,15 +333,16 @@ namespace BrokenHeart.Editor
                     normalCameraSize = camera.orthographicSize;
                     controlSlot = inventory.SelectedIndex;
                     wheelSteps = 0;
-                    InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.LeftCtrl));
+                    InputState.Change(keyboard, new KeyboardState(Key.LeftCtrl));
                     break;
                 case 10:
                     if (QueueWheel(Vector2.up, 10)) return;
                     Check(Mathf.Approximately(follow.Zoom, 2) &&
                         Mathf.Abs(camera.orthographicSize / normalCameraSize - 0.5f) < 0.02f,
-                        "Ctrl and wheel up zoom the rendered camera to at most 2x.");
+                        $"Ctrl and wheel up zoom the rendered camera to at most 2x (zoom {follow.Zoom}, " +
+                        $"size {camera.orthographicSize}/{normalCameraSize}, mode {inventory.Mode}, focus {Application.isFocused}).");
                     wheelSteps = 0;
-                    InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.RightCtrl));
+                    InputState.Change(keyboard, new KeyboardState(Key.RightCtrl));
                     break;
                 case 11:
                     if (QueueWheel(Vector2.down, 14)) return;
@@ -337,7 +355,7 @@ namespace BrokenHeart.Editor
                 case 12:
                     if (QueueWheel(Vector2.up, 4)) return;
                     Check(Mathf.Approximately(follow.Zoom, 1), "Camera zoom returns to its default scale.");
-                    InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+                    InputState.Change(keyboard, new KeyboardState());
                     var slots = new ItemStack[inventory.Model.Capacity];
                     slots[0] = new ItemStack(dirt, 2);
                     inventory.Model.Restore(slots);
@@ -361,7 +379,35 @@ namespace BrokenHeart.Editor
                     break;
                 case 14:
                     Check(world.Get(firstHeldCell) == dirt.PlaceableBlock, "Right mouse places the first block.");
+                    InputState.Change(keyboard, new KeyboardState(Key.E));
                     QueueMouseAt(world, secondHeldCell, MouseButton.Right);
+                    nextStep = Time.time + 0.22f;
+                    step = 140;
+                    return;
+                case 140:
+                    Check(inventory.IsOpen && world.Get(secondHeldCell) == null, $"Opening inventory blocks held placement (mode {inventory.Mode}, block {world.Get(secondHeldCell)?.Id}, current key device {Keyboard.current == keyboard}).");
+                    InputState.Change(keyboard, new KeyboardState());
+                    step = 141;
+                    return;
+                case 141:
+                    InputState.Change(keyboard, new KeyboardState(Key.E));
+                    QueueMouseAt(world, secondHeldCell, MouseButton.Right);
+                    nextStep = Time.time + 0.22f;
+                    step = 142;
+                    return;
+                case 142:
+                    Check(!inventory.IsOpen && world.Get(secondHeldCell) == null, "Closing inventory does not replay held placement.");
+                    InputState.Change(keyboard, new KeyboardState());
+                    InputState.Change(mouse, new MouseState());
+                    step = 143;
+                    return;
+                case 143:
+                    QueueMouseAt(world, firstHeldCell, MouseButton.Right);
+                    step = 144;
+                    return;
+                case 144:
+                    QueueMouseAt(world, secondHeldCell, MouseButton.Right);
+                    step = 14;
                     break;
                 case 15:
                     Check(world.Get(secondHeldCell) == dirt.PlaceableBlock && inventory.Selected.Empty,
@@ -376,7 +422,7 @@ namespace BrokenHeart.Editor
                     break;
                 case 17:
                     Check(world.Get(secondHeldCell) == null, "Holding left mouse mines the next block under the cursor.");
-                    InputSystem.QueueStateEvent(mouse, new MouseState());
+                    InputState.Change(mouse, new MouseState());
                     var traveller = player.GetComponent<Rigidbody2D>();
                     originalPlayerPosition = traveller.position;
                     dropPosition = traveller.position + Vector2.right * 4;
@@ -421,14 +467,15 @@ namespace BrokenHeart.Editor
         private static bool QueueWheel(Vector2 direction, int count)
         {
             if (wheelSteps++ >= count) return false;
-            InputSystem.QueueDeltaStateEvent(mouse.scroll, direction);
+            InputState.Change(keyboard, new KeyboardState(step == 11 ? Key.RightCtrl : Key.LeftCtrl));
+            InputState.Change(mouse.scroll, direction);
             return true;
         }
 
         private static void QueueMouseAt(BlockWorld world, Vector2Int cell, MouseButton button)
         {
             var state = new MouseState { position = Camera.main.WorldToScreenPoint(world.Center(cell)) };
-            InputSystem.QueueStateEvent(mouse, state.WithButton(button));
+            InputState.Change(mouse, state.WithButton(button));
         }
 
         private static void CheckQuickPlayerTransfer(PlayerInventory inventory)
@@ -451,6 +498,17 @@ namespace BrokenHeart.Editor
                 inventory.QuickUnequip(5) && inventory.Equipped(5).Empty && inventory.Model.Count(shield) == 1,
                 "Quick transfer equips and removes equipment through the normal slots.");
             inventory.SetOpen(false);
+            var pack = inventory.Catalog.Find("trail_backpack");
+            int gear = PlayerInventory.EquipmentCount - 1;
+            inventory.Model.Add(pack, 1);
+            int bag = Enumerable.Range(0, inventory.Model.Capacity).First(i => inventory.Model[i].Item == pack);
+            Check(inventory.Equip(bag, gear), "Equipping a backpack expands the inventory.");
+            inventory.Model.Move(0, inventory.Model.Capacity - 1);
+            long revision = inventory.Model.Revision;
+            Check(!inventory.QuickUnequip(gear) && inventory.Model.Revision == revision && inventory.Equipped(gear).Item == pack,
+                "Removing a backpack with items in its last row preserves gear and inventory.");
+            inventory.Model.Move(inventory.Model.Capacity - 1, 0);
+            Check(inventory.QuickUnequip(gear), "The backpack can be removed once its last row is empty.");
             inventory.Model.ReplaceWith(original);
         }
 
@@ -495,6 +553,8 @@ namespace BrokenHeart.Editor
             Check(storage[0].Count == 1 && storage[9].Item == dirt && storage[10].Count == 99 &&
                   storage[11].Count == 8 && storage[44].Empty, "Sorting merges backpack stacks and keeps the hotbar in place.");
 
+            long beforeFailure = storage.Revision;
+            Check(!storage.Move(0, 9, 0) && beforeFailure == storage.Revision, "A rejected move leaves the revision unchanged.");
             var crowded = new InventoryModel(2);
             crowded.Add(grass, 98);
             crowded.Add(dirt, 99);
@@ -535,10 +595,12 @@ namespace BrokenHeart.Editor
             int previousNotifications = notifications;
             inventory.Collect(primary.item, 1);
             Check(notifications == previousNotifications, "Already known memories do not notify again.");
+            Check(crafting.CanCraft(recipe, out _) && crafting.CanCraft(recipe, out _), "Recipe preview stays available across repeated HUD draws.");
             int stoneBefore = inventory.Model.Count(primary.item);
             Check(crafting.Craft(recipe, out _) && inventory.Model.Count(recipe.Output) == recipe.OutputCount &&
                 inventory.Model.Count(primary.item) == stoneBefore - primary.count, "Crafting consumes costs and produces output atomically.");
             inventory.Model.Remove(primary.item, inventory.Model.Count(primary.item));
+            Check(!crafting.CanCraft(recipe, out _), "Removing materials invalidates the previous crafting preview.");
             int dirtBefore = inventory.Model.Count(inventory.Catalog.Find("dirt"));
             Check(!crafting.Craft(recipe, out _) && inventory.Model.Count(inventory.Catalog.Find("dirt")) == dirtBefore,
                 "Failed crafting does not consume other ingredients.");
@@ -567,6 +629,7 @@ namespace BrokenHeart.Editor
             Check(crafting.Craft(planks, out _) && crafting.Craft(planks, out _), "The player can make planks by hand.");
             var bench = crafting.Recipes.Single(recipe => recipe.Id == "workbench");
             Check(crafting.Craft(bench, out _), "The player can build a workbench by hand.");
+            inventory.SetOpen(false);
             var station = PlaceStation(bench.Output);
             Check(Object.FindAnyObjectByType<WorkstationSystem>().Open(station.Cell) && crafting.AtWorkbench,
                 "Opening a placed workbench unlocks its crafting menu.");
@@ -618,7 +681,9 @@ namespace BrokenHeart.Editor
                 var recipe = crafting.Recipes.Single(candidate => candidate.Id == id);
                 foreach (var cost in recipe.Ingredients) inventory.Collect(cost.item, cost.count);
                 Check(crafting.Craft(recipe, out _), "The workbench crafts " + id + ".");
+                inventory.SetOpen(false);
                 PlaceStation(recipe.Output);
+                stations.Open(bench.Cell);
             }
             var unsupported = new Vector2Int(world.CellAt(player.transform.position).x + 2, 3);
             foreach (var station in stations.Stations)
@@ -680,6 +745,11 @@ namespace BrokenHeart.Editor
                   stations.TransferMatchingChestItems(true) == 0 && inventory.Model.Count(ingot) == 2,
                 "Opened chest slots support quick transfer back to the player's storage.");
             var restoreStations = save.Capture();
+            chest.Contents.Add(ingot, 3);
+            int floorCount = Object.FindObjectsByType<ItemDrop>().Where(d => d.Item == ingot).Sum(d => d.Count);
+            Check(stations.Remove(chest, true) && !stations.Remove(chest, true) &&
+                Object.FindObjectsByType<ItemDrop>().Where(d => d.Item == ingot).Sum(d => d.Count) == floorCount + 3,
+                "Breaking a chest releases its contents exactly once.");
             var farSupport = furnace.Cell + new Vector2Int(2, -1);
             world.Set(farSupport, null);
             Check(stations.At(furnace.Cell) == null && !stations.CanPlace(furnace.Item, furnace.Cell),
@@ -943,7 +1013,117 @@ namespace BrokenHeart.Editor
             weather.SetWeather(WeatherKind.Clear); Check(weather.RainRate==0,"Clear weather disables rain.");
             CheckArsenal();
             var vitals=player.GetComponent<PlayerVitals>(); vitals.Damage(8); Check(vitals.Health==92,"Damage reduces player health.");
-            vitals.Restore(100); clock.SetHour(10);
+            var sanity = player.GetComponent<SanitySystem>();
+            float before = sanity.Value;
+            Check(!vitals.TryDamage(new DamageHit(DamageKind.Mental, enemies.gameObject, 0, 8)) && sanity.Value == before,
+                "Repeated hits during the grace period do not deal mental damage.");
+            vitals.Restore(100);
+            Check(vitals.TryDamage(new DamageHit(DamageKind.Mental, enemies.gameObject, 0, 8)) &&
+                vitals.Health == 100 && Mathf.Approximately(sanity.Value, before - 8), "A mental hit can affect sanity alone.");
+            vitals.Restore(100);
+            CheckCombat(enemies, clock, vitals);
+            clock.SetHour(10);
+        }
+
+        private static void CheckCombat(EnemySystem enemies, DayNightSystem clock, PlayerVitals vitals)
+        {
+            // Enable encounters only on this Play Mode instance; the saved scene stays peaceful.
+            var settings = new SerializedObject(enemies);
+            var enabled = settings.FindProperty("encountersEnabled");
+            enabled.boolValue = true;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            var inventory = player.GetComponent<PlayerInventory>();
+            var interaction = player.GetComponent<BlockInteraction>();
+            var world = Object.FindAnyObjectByType<BlockWorld>();
+            var body = player.GetComponent<Rigidbody2D>();
+            Vector2 origin = body.position;
+            var arena = new Vector2(0.5f, 15.5f);
+            var wall = new GameObject("Combat check wall", typeof(BoxCollider2D));
+            wall.GetComponent<BoxCollider2D>().size = new Vector2(0.16f, 2);
+            wall.SetActive(false);
+            void HeroAt(Vector2 pos)
+            {
+                player.transform.position = pos;
+                body.position = pos;
+                Physics2D.SyncTransforms();
+            }
+            void Advance(EnemyActor actor, float seconds)
+            {
+                Physics2D.SyncTransforms();
+                for (int i = 0; i <= Mathf.CeilToInt(seconds / Time.fixedDeltaTime); i++)
+                    actor.SendMessage("FixedUpdate");
+            }
+            try
+            {
+                HeroAt(arena);
+                var shade = enemies.Spawn(enemies.Types.First(t => !t.underground), arena + Vector2.right * 5);
+                Advance(shade, 0.05f);
+                Check(shade.State == EnemyState.Chase && shade.GetComponent<Rigidbody2D>().linearVelocity.x < 0,
+                    $"The Forest Shade chases a visible target in darkness (state {shade.State}, position {shade.GetComponent<Rigidbody2D>().position}, " +
+                    $"hero {player.transform.position}, speed {shade.GetComponent<Rigidbody2D>().linearVelocity.x}, light {clock.SurfaceIntensity}).");
+                clock.SetHour(12);
+                Advance(shade, 0.05f);
+                Check(shade.GetComponent<Rigidbody2D>().linearVelocity.x > 0, "Strong daylight makes the Forest Shade retreat.");
+                clock.SetHour(0);
+                HeroAt(arena + Vector2.right * 4);
+                Advance(shade, 0.05f);
+                Check(shade.State == EnemyState.Windup && shade.GetComponent<SpriteRenderer>().color == shade.Data.warningColor,
+                    "The Forest Shade changes colour before an attack.");
+                HeroAt(arena);
+                Advance(shade, shade.Data.windup + 0.1f);
+                Check(vitals.Health == 100, "Stepping away after the warning avoids the hit.");
+                enemies.Remove(shade, false);
+                var crawler = enemies.Spawn(enemies.Types.First(t => t.underground), arena + Vector2.right * 5);
+                Advance(crawler, 0.05f);
+                Check(crawler.State == EnemyState.Idle, "A distant Cave Crawler waits in ambush.");
+                HeroAt(arena + Vector2.right * 2.5f);
+                Advance(crawler, crawler.Data.windup + 0.1f);
+                Check(crawler.State == EnemyState.Attack && crawler.GetComponent<Rigidbody2D>().linearVelocity.x < -crawler.Data.speed,
+                    "The Cave Crawler commits to a short dash after the warning.");
+                HeroAt(arena + Vector2.right * 4);
+                wall.transform.position = arena + Vector2.right * 4.5f;
+                wall.SetActive(true);
+                Physics2D.SyncTransforms();
+                Advance(crawler, 0.1f);
+                Check(vitals.Health == 100 && crawler.State == EnemyState.Recovery,
+                    "A wall placed during the dash prevents damage on impact.");
+                Advance(crawler, crawler.Data.recovery + 0.2f);
+                Check(crawler.State == EnemyState.Idle, "A solid wall prevents detection at melee distance.");
+                wall.SetActive(false);
+                Physics2D.SyncTransforms();
+                var cell = world.CellAt(player.transform.position) + Vector2Int.up;
+                foreach (var mode in new[] { PlayerInputMode.Inventory, PlayerInputMode.Map, PlayerInputMode.Pause })
+                {
+                    if (mode == PlayerInputMode.Inventory) inventory.SetOpen(true);
+                    if (mode == PlayerInputMode.Map) inventory.SetMapOpen(true);
+                    if (mode == PlayerInputMode.Pause) Time.timeScale = 0;
+                    Check(inventory.Mode == mode && !enemies.TryAttack(Vector2.right) && !interaction.Mine(cell, 100) &&
+                        !interaction.TryPlace(cell), mode + " blocks attack, mining and building.");
+                    Time.timeScale = 1;
+                    inventory.SetOpen(false);
+                    inventory.SetMapOpen(false);
+                }
+                Advance(crawler, crawler.Data.windup + 0.1f);
+                Check(vitals.Health < 100, "An unobstructed committed hit reaches the player.");
+                int xp = inventory.Progress.TotalExperience;
+                int loot = Object.FindObjectsByType<ItemDrop>().Where(d => d.Item == crawler.Data.drop).Sum(d => d.Count);
+                Check(enemies.TryAttack(Vector2.right), "The player can strike again in gameplay.");
+                crawler.Damage(1000);
+                crawler.Damage(1000);
+                Check(crawler.State == EnemyState.Dead && inventory.Progress.TotalExperience == xp + 20 &&
+                    Object.FindObjectsByType<ItemDrop>().Where(d => d.Item == crawler.Data.drop).Sum(d => d.Count) == loot + 1,
+                    "Enemy death awards experience and loot exactly once.");
+            }
+            finally
+            {
+                Time.timeScale = 1;
+                HeroAt(origin);
+                vitals.Restore(100);
+                enemies.Clear();
+                enabled.boolValue = false;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+                Object.Destroy(wall);
+            }
         }
 
         private static void CheckArsenal()
@@ -1029,6 +1209,8 @@ namespace BrokenHeart.Editor
 
         private static void Finish()
         {
+            InputSystem.onAfterUpdate -= RunStep;
+            if (running) InputSystem.settings.editorInputBehaviorInPlayMode = previousRouting;
             running = false;
             step = -1;
             SessionState.SetBool("BrokenHeart.Checks", false);

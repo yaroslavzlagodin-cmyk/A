@@ -6,6 +6,8 @@ using UnityEngine.Rendering.Universal;
 
 namespace BrokenHeart.Inventory
 {
+    public enum PlayerInputMode { Gameplay, Inventory, Map, Pause, Sleep }
+
     [DefaultExecutionOrder(-100)]
     public sealed class PlayerInventory : MonoBehaviour
     {
@@ -22,6 +24,23 @@ namespace BrokenHeart.Inventory
         public ItemStack Selected => Model[SelectedIndex];
         public bool IsOpen { get; private set; }
         public bool IsMapOpen { get; private set; }
+        private BrokenHeart.Systems.SleepSystem sleep;
+        private bool waitLeft, waitRight, waitAttack;
+        public PlayerInputMode Mode => Time.timeScale == 0 ? PlayerInputMode.Pause :
+            sleep != null && sleep.Resting ? PlayerInputMode.Sleep :
+            IsOpen ? PlayerInputMode.Inventory : IsMapOpen ? PlayerInputMode.Map : PlayerInputMode.Gameplay;
+        public bool CanUseLeft => !waitLeft && Mode == PlayerInputMode.Gameplay;
+        public bool CanUseRight => !waitRight && Mode == PlayerInputMode.Gameplay;
+        public bool CanUseAttackKey => !waitAttack && Mode == PlayerInputMode.Gameplay;
+
+        // A press that belongs to a menu must end before it can act on the world.
+        public void CaptureHeldActions()
+        {
+            waitLeft = Mouse.current?.leftButton.isPressed == true;
+            waitRight = Mouse.current?.rightButton.isPressed == true;
+            waitAttack = Keyboard.current?.fKey.isPressed == true;
+        }
+
         public int BaseCapacity => capacity;
         public const int BackpackCount = 4;
         public const int EquipmentCount = 6 + BackpackCount;
@@ -33,6 +52,7 @@ namespace BrokenHeart.Inventory
         private static readonly Key[] Keys = { Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9 };
         private void Awake()
         {
+            sleep = GetComponent<BrokenHeart.Systems.SleepSystem>();
             catalog.Validate();
             Model = new InventoryModel(capacity);
             Model.Changed += () => ContentsChanged?.Invoke();
@@ -40,13 +60,20 @@ namespace BrokenHeart.Inventory
         }
         private void Update()
         {
-            if (Time.timeScale == 0) return;
+            if (Mode != PlayerInputMode.Gameplay) CaptureHeldActions();
+            else
+            {
+                waitLeft &= Mouse.current?.leftButton.isPressed == true;
+                waitRight &= Mouse.current?.rightButton.isPressed == true;
+                waitAttack &= Keyboard.current?.fKey.isPressed == true;
+            }
+            if (Mode is PlayerInputMode.Pause or PlayerInputMode.Sleep) return;
             var keyboard = Keyboard.current;
             if (keyboard != null)
             {
                 if (keyboard.eKey.wasPressedThisFrame || keyboard.tabKey.wasPressedThisFrame) SetOpen(!IsOpen);
                 if (keyboard.mKey.wasPressedThisFrame) SetMapOpen(!IsMapOpen);
-                if (keyboard.escapeKey.wasPressedThisFrame) { IsOpen = false; IsMapOpen = false; }
+                if (keyboard.escapeKey.wasPressedThisFrame) { SetOpen(false); SetMapOpen(false); }
                 for (int i = 0; i < HotbarSize && i < Keys.Length; i++)
                     if (keyboard[Keys[i]].wasPressedThisFrame) Select(i);
             }
@@ -66,11 +93,15 @@ namespace BrokenHeart.Inventory
         }
         public void SetOpen(bool open)
         {
+            if (open && Mode is (PlayerInputMode.Sleep or PlayerInputMode.Pause)) return;
+            if (IsOpen != open) CaptureHeldActions();
             IsOpen = open;
             if (open) IsMapOpen = false;
         }
         public void SetMapOpen(bool open)
         {
+            if (open && Mode is (PlayerInputMode.Sleep or PlayerInputMode.Pause)) return;
+            if (IsMapOpen != open) CaptureHeldActions();
             IsMapOpen = open;
             if (open) IsOpen = false;
         }
@@ -172,11 +203,13 @@ namespace BrokenHeart.Inventory
             return ChangeEquipment(next, gearIndex, replacement);
         }
 
-        public void MoveEquipped(int from, int to)
+        public bool MoveEquipped(int from, int to)
         {
             if (from < 0 || from >= EquipmentCount || to < 0 || to >= EquipmentCount ||
-                from == to || SlotType(from) != SlotType(to)) return;
+                from == to || SlotType(from) != SlotType(to) || equipment[from].Empty) return false;
             (equipment[from], equipment[to]) = (equipment[to], equipment[from]);
+            ContentsChanged?.Invoke();
+            return true;
         }
 
         private bool ValidMove(int bagIndex, int gearIndex) =>

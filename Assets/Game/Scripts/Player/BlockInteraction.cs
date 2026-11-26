@@ -47,9 +47,10 @@ namespace BrokenHeart.Player
         {
             TargetStation = null;
             var mouse = Mouse.current;
-            if (Time.timeScale == 0 || motor.InputSuppressed || inventory.IsOpen || inventory.IsMapOpen ||
+            if (inventory.Mode != PlayerInputMode.Gameplay || motor.InputSuppressed ||
                 (hud != null && hud.BlocksWorldPointer) || mouse == null || !Application.isFocused)
             {
+                inventory.CaptureHeldActions();
                 ClearPointer();
                 return;
             }
@@ -58,7 +59,7 @@ namespace BrokenHeart.Player
             var point = view.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -view.transform.position.z));
             var cell = world.CellAt(point);
             if (IsInReach(cell)) TargetStation = stations?.At(cell);
-            if (mouse.rightButton.wasPressedThisFrame && stations != null && stations.Open(cell))
+            if (inventory.CanUseRight && mouse.rightButton.wasPressedThisFrame && stations != null && stations.Open(cell))
             {
                 ClearPointer();
                 return;
@@ -67,7 +68,7 @@ namespace BrokenHeart.Player
             if (selected?.Category == ItemCategory.Weapon)
             {
                 ClearPointer();
-                if (mouse.leftButton.isPressed) enemies?.TryAttack(point - playerShape.bounds.center);
+                if (inventory.CanUseLeft && mouse.leftButton.isPressed) enemies?.TryAttack(point - playerShape.bounds.center);
                 return;
             }
             var center = world.Center(cell);
@@ -80,7 +81,7 @@ namespace BrokenHeart.Player
             outline.startColor = outline.endColor = InReach ? new Color(1f, 0.86f, 0.42f) : new Color(1f, 0.3f, 0.3f);
             var keyboard = Keyboard.current;
             bool control = keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
-            if (mouse.leftButton.isPressed)
+            if (inventory.CanUseLeft && mouse.leftButton.isPressed)
             {
                 Mine(cell, Time.deltaTime, control);
                 return;
@@ -88,7 +89,7 @@ namespace BrokenHeart.Player
             ResetMining();
             bool placingBlock = selected != null && selected.PlaceableBlock != null &&
                 selected.Station == StationKind.None && selected.Device == null;
-            if ((mouse.rightButton.wasPressedThisFrame || (placingBlock && mouse.rightButton.isPressed)) && TryPlace(cell))
+            if (inventory.CanUseRight && (mouse.rightButton.wasPressedThisFrame || (placingBlock && mouse.rightButton.isPressed)) && TryPlace(cell))
                 stations?.HidePreview();
         }
 
@@ -97,6 +98,7 @@ namespace BrokenHeart.Player
 
         public bool TryPlace(Vector2Int cell)
         {
+            if (inventory.Mode != PlayerInputMode.Gameplay) return false;
             var item = inventory.Selected.Item;
             if (item == null || !IsInReach(cell)) return false;
             if (item.Station == StationKind.None && !CanPlace(world.Center(cell))) return false;
@@ -116,6 +118,7 @@ namespace BrokenHeart.Player
 
         public bool Mine(Vector2Int cell, float seconds, bool fellTree = false)
         {
+            if (inventory.Mode != PlayerInputMode.Gameplay) { ResetMining(); return false; }
             var tool = inventory.Selected.Item;
             if (!IsInReach(cell) || tool?.Category == ItemCategory.Weapon) { ResetMining(); return false; }
             var block = world.Get(cell);

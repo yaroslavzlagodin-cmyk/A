@@ -50,9 +50,9 @@ namespace BrokenHeart.Editor
             var clock=GetOrAdd<DayNightSystem>(world.gameObject); Set(clock,"weather",weather); Set(clock,"view",Camera.main);
             Set(clock,"sunlight",Object.FindObjectsByType<Light2D>().First(l=>l.lightType==Light2D.LightType.Global));
             var vitals=GetOrAdd<PlayerVitals>(inventory.gameObject);
-            var shade=Asset<EnemyData>("Assets/Game/Data/ForestShade.asset"); shade.biome="forest"; shade.underground=false;
+            var shade=Asset<EnemyData>("Assets/Game/Data/ForestShade.asset"); shade.damageKind=DamageKind.Mental; shade.sanityDamage=8; shade.biome="forest"; shade.underground=false;
             shade.sprite=MakeIcon("ForestShade",new Color(0.22f,0.18f,0.32f),4); shade.drop=inventory.Catalog.Find("wood"); EditorUtility.SetDirty(shade);
-            var crawler=Asset<EnemyData>("Assets/Game/Data/CaveCrawler.asset"); crawler.underground=true; crawler.speed=1.6f; crawler.damage=10;
+            var crawler=Asset<EnemyData>("Assets/Game/Data/CaveCrawler.asset"); crawler.sanityDamage=3; crawler.underground=true; crawler.speed=1.6f; crawler.damage=10;
             crawler.sprite=MakeIcon("CaveCrawler",new Color(0.4f,0.28f,0.46f),4); crawler.drop=inventory.Catalog.Find("copper"); EditorUtility.SetDirty(crawler);
             var enemies=GetOrAdd<EnemySystem>(world.gameObject); Set(enemies,"world",world); Set(enemies,"player",vitals); Set(enemies,"clock",clock);
             Set(enemies,"material",lit); SetArray(enemies,"types",new[] { shade,crawler });

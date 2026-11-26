@@ -57,6 +57,7 @@ namespace BrokenHeart.Core.Profiles
         public void SetPaused(bool value)
         {
             if (paused == value) return;
+            player.CaptureHeldActions();
             paused = value;
             Time.timeScale = paused ? 0 : 1;
             bool resting = player.TryGetComponent<SleepSystem>(out var sleep) && sleep.Resting;
