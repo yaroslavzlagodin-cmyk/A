@@ -29,6 +29,8 @@ namespace BrokenHeart.Inventory
         [SerializeField] private StationKind station;
         [SerializeField] private ItemData smeltsTo;
         [SerializeField, Min(0)] private float fuelSeconds;
+        [SerializeField, Range(0, 1)] private float sanityProtection;
+        public float SanityProtection => sanityProtection;
         public string Id => id;
         public string DisplayName => string.IsNullOrEmpty(displayName) ? name : displayName;
         public Sprite Icon => icon;

@@ -23,4 +23,4 @@ MonoBehaviour:
   recovery: 3
   sightRange: 16
   sprite: {fileID: 4093480436322176185, guid: 0ef4066ca140e6f40b4277228722b7e3, type: 3}
-  drop: {fileID: 0}
+  drop: {fileID: 11400000, guid: c0cbb6a81d5b44679a1f3ab794c493e6, type: 2}

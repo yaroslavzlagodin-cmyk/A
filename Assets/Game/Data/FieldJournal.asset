@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9017d0e859dc41058ea5eae96f3fbbe4, type: 3}
+  m_Name: FieldJournal
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Systems.KnowledgeBook
+  entries:
+  - id: lore.outline
+    kind: 0
+    condition: 0
+    prerequisite: ''
+    experience: 6
+    title: "The watching shadow"
+    description: "Pale eyes and a dark silhouette appear at night as sanity falls to 70. The eyes vanish up close."
+  - id: lore.anomaly
+    kind: 0
+    condition: 1
+    prerequisite: lore.outline
+    experience: 8
+    title: "False stone"
+    description: "The imitation has no weight. Approach slowly and examine it before it fades."
+  - id: lore.darkness
+    kind: 1
+    condition: 2
+    prerequisite: lore.anomaly
+    experience: 10
+    title: "Light in the dark"
+    description: "The lamp comes back on. At a workbench, craft a Mind Amulet or a Hearth Ward."
+  - id: lore.wound
+    kind: 0
+    condition: 3
+    prerequisite: lore.outline
+    experience: 8
+    title: "The warning flash"
+    description: "A physical shadow flashes before it strikes. Step back or put a solid wall between you."
+  - id: lore.victory
+    kind: 1
+    condition: 4
+    prerequisite: lore.anomaly
+    experience: 15
+    title: "Sealed light"
+    description: "Physical shadows form at 15 sanity or less. Their residue can seal a lamp against prolonged dimming."
+  - id: lore.trail
+    kind: 2
+    condition: 4
+    prerequisite: lore.victory
+    experience: 6
+    title: "Footprints of the giant"
+    description: "A greater shadow passed through this world. The journal records the site of the encounter."

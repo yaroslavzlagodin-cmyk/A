@@ -8,6 +8,8 @@ namespace BrokenHeart.Systems.Energy
         [Min(0)] public float generationPerSecond;
         [Min(0)] public float consumptionPerSecond;
         [Min(1)] public float connectionRange = 6;
+        [Min(0)] public float wardRadius;
+        [Range(0.1f, 1)] public float dimDurationFactor = 1;
         public Color color = Color.cyan;
     }
 }

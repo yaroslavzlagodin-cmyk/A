@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5948ee1d214b9940a25c18966911550, type: 3}
+  m_Name: sealed_lamp
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Crafting.RecipeData
+  id: sealed_lamp
+  category: 3
+  ingredients:
+  - item: {fileID: 11400000, guid: c0cbb6a81d5b44679a1f3ab794c493e6, type: 2}
+    count: 1
+  - item: {fileID: 11400000, guid: 766fc841b601dfe44a310c02c5190843, type: 2}
+    count: 1
+  - item: {fileID: 11400000, guid: 1d6331268927e9c9e1164ae03d6a2d6c, type: 2}
+    count: 1
+  output: {fileID: 11400000, guid: 68743e3d48054791816e4fe2b4685ff7, type: 2}
+  outputCount: 1
+  requiredKnowledge: lore.victory

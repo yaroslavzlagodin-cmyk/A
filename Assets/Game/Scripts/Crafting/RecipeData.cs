@@ -24,6 +24,8 @@ namespace BrokenHeart.Crafting
         public Ingredient[] Ingredients => ingredients;
         public ItemData Output => output;
         public int OutputCount => outputCount;
+        [SerializeField] private string requiredKnowledge;
+        public string RequiredKnowledge => requiredKnowledge;
         public bool ByHand => byHand;
 
         internal InventoryModel AfterSpendingMaterials(InventoryModel inventory)

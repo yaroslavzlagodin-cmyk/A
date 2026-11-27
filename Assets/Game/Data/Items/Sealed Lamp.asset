@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f26db9c0f7525d4cb2aaaf5fc3ed58d, type: 3}
+  m_Name: Sealed Lamp
+  m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Inventory.ItemData
+  id: sealed_lamp
+  displayName: Sealed Lamp
+  icon: {fileID: -3535221090349844623, guid: edd28469d2410694d9ac0e1abc24c4d6, type: 3}
+  maxStack: 99
+  category: 4
+  placeableBlock: {fileID: 0}
+  miningPower: 1
+  device: {fileID: 11400000, guid: eb5555f1f2bd46baac7ec906c107d156, type: 2}
+  equipmentSlot: 0
