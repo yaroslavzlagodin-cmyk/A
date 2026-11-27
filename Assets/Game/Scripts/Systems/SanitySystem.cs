@@ -9,6 +9,8 @@ namespace BrokenHeart.Systems
     {
         [SerializeField] private float uneaseAt = 70, watchedAt = 50, pursuedAt = 30, manifestationAt = 15;
         [SerializeField, Range(2, 3)] private float recoveryMargin = 2.5f;
+        private Inventory.PlayerInventory inventory;
+        private void Awake() => inventory = GetComponent<Inventory.PlayerInventory>();
         public float Value { get; private set; } = 100;
         public float AwakeSeconds { get; private set; }
         public bool HasReachedZero { get; private set; }
@@ -27,6 +29,10 @@ namespace BrokenHeart.Systems
             SanityStage.Manifestation => manifestationAt,
             _ => 0
         };
+
+        // Research uses the listed sanity bands even while visual effects fade out more slowly.
+        internal bool InResearchRange(SanityStage stage) =>
+            Value <= Threshold(stage) && Value > Threshold(stage + 1);
 
         private void SetStage(SanityStage start)
         {
@@ -55,6 +61,11 @@ namespace BrokenHeart.Systems
 
         public void Adjust(float amount)
         {
+            if (amount < 0 && inventory != null)
+            {
+                var charm = inventory.Equipped((int)Inventory.EquipmentSlot.Shield - 1).Item;
+                if (charm != null) amount *= 1 - charm.SanityProtection;
+            }
             float next = Mathf.Clamp(Value + amount, 0, 100);
             if (Value == next) return;
             Value = next;

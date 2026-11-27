@@ -1168,7 +1168,7 @@ namespace BrokenHeart.Editor
             sanity.Adjust(-1000);sanity.Adjust(-1000);
             Check(sanity.Value==0 && collapses==1,"Sanity clamps at zero and first-collapse fires once.");
             bool memory=false;foreach(var id in player.GetComponent<MemorySystem>().Unlocked)if(id=="memory.mind_protection")memory=true;
-            Check(memory,"First collapse unlocks mind-protection memory.");
+            Check(!memory && !player.GetComponent<MemorySystem>().HasKnowledge("lore.darkness"), "Collapse alone does not award protection knowledge.");
             Check(Object.FindAnyObjectByType<NoxelDirector>() == null, "The game scene no longer runs Noxel's taunts.");
             var save=Object.FindAnyObjectByType<SaveSystem>();var snapshot=save.Capture();sanity.Adjust(80);save.Restore(JsonUtility.FromJson<SaveData>(JsonUtility.ToJson(snapshot)));
             Check(sanity.Value==0 && sanity.HasReachedZero,"Sanity and first-collapse state survive JSON roundtrip.");
@@ -1238,6 +1238,38 @@ namespace BrokenHeart.Editor
                     "The reusable vision sprites have no colliders or loot.");
 
                 clock.SetHour(12);
+                var pack = player.GetComponent<PlayerInventory>();
+                var memory = player.GetComponent<MemorySystem>();
+                var workshop = world.GetComponent<WorkstationSystem>();
+                var bench = workshop.Stations.Single(station => station.Kind == StationKind.Workbench);
+                var originalHero = player.transform.position;
+                void MoveHero(Vector3 p)
+                {
+                    player.transform.position = p;
+                    player.GetComponent<Rigidbody2D>().position = p;
+                    Physics2D.SyncTransforms();
+                }
+                var craft = player.GetComponent<CraftingSystem>();
+                var amulet = craft.Recipes.Single(r => r.Id == "mind_amulet");
+                var ward = craft.Recipes.Single(r => r.Id == "hearth_ward");
+                var sealedLamp = craft.Recipes.Single(r => r.Id == "sealed_lamp");
+                void OpenBench()
+                {
+                    MoveHero(world.Center(bench.Cell) + Vector3.up);
+                    if (!workshop.Open(bench.Cell)) throw new Exception("Workbench is unreachable in the research check.");
+                }
+                OpenBench();
+                foreach (var exclusive in new[] { amulet, ward, sealedLamp })
+                {
+                    foreach (var cost in exclusive.Ingredients) pack.Collect(cost.item, cost.count);
+                    pack.Collect(exclusive.Output, 1);
+                    Check(!memory.Study(exclusive.Output) && !memory.Knows(exclusive) && !memory.CanView(exclusive) &&
+                        !craft.CanCraft(exclusive, out _) && !craft.Craft(exclusive, out _),
+                        exclusive.Id + " resists materials, found-item study, preview and direct crafting.");
+                }
+                pack.Model.Remove(catalog.Find("shadow_residue"), pack.Model.Count(catalog.Find("shadow_residue")));
+                pack.SetOpen(false);
+                MoveHero(originalHero);
                 sanity.Restore(70, 0, true);
                 effects.Tick(31);
                 Check(!effects.EyesVisible && Visible("Moving shadow") == 0, "At 70 sanity the first visions wait for night.");
@@ -1249,6 +1281,14 @@ namespace BrokenHeart.Editor
                 effects.Tick(60);
                 Check(effects.EyesVisible, "Pause freezes the active vision.");
                 Time.timeScale = 1;
+                sanity.Adjust(1);
+                Check(effects.EyesVisible && !effects.TryResearch(), "A lingering vision above 70 sanity grants no field knowledge.");
+                sanity.Adjust(-1);
+                Check(!memory.HasKnowledge("lore.outline") && effects.TryResearch() && memory.TrailStep == 1 &&
+                    memory.HasKnowledge("lore.outline"), "Deliberately observing a silhouette begins this journey.");
+                int observedXp = pack.Progress.TotalExperience;
+                effects.TryResearch();
+                Check(pack.Progress.TotalExperience == observedXp, "Observing the same shadow twice gives one reward.");
                 var eye = pool.First(r => r.name == "Unreal eyes" && r.gameObject.activeSelf);
                 player.transform.position = eye.transform.position;
                 effects.Tick(0.1f);
@@ -1265,6 +1305,13 @@ namespace BrokenHeart.Editor
                     effects.Tick(1);
                     watchers |= Visible("Unreal eyes") >= 2;
                     falseStone |= Visible("False stone") > 0;
+                    if (Visible("False stone") > 0 && memory.TrailStep == 1)
+                    {
+                        var stone = pool.First(r => r.name == "False stone").transform.position;
+                        MoveHero(Vector3.MoveTowards(stone, pos, 3.5f));
+                        Check(effects.TryResearch() && memory.TrailStep == 2, "Examining a live anomaly adds its behaviour to the journal.");
+                        MoveHero(pos);
+                    }
                 }
                 Check(watchers && falseStone && enemies.Actors.Count == 0, "The watched stage adds clusters of eyes and false objects.");
                 sanity.Restore(30, 0, true);
@@ -1273,11 +1320,34 @@ namespace BrokenHeart.Editor
                     effects.Tick(1);
                     pursuit |= Visible("Moving shadow") > 0 && Visible("Unreal eyes") == 0;
                     dim |= lamp.IsDimmed;
+                    if (lamp.IsDimmed && !memory.HasKnowledge("lore.darkness")) effects.TryResearch();
                     recovered |= dim && !lamp.IsDimmed;
                 }
                 Check(pursuit && dim && recovered && lamp.Powered && lamp.Stored == 6 && enemies.Actors.Count == 0,
                     "Pursuit and temporary dimming leave lamp charge and physical safety intact.");
 
+                Check(memory.HasKnowledge("lore.darkness") && memory.Knows(amulet) && memory.Knows(ward) &&
+                    !memory.Knows(sealedLamp), "Investigating and surviving the blackout opens both protection recipes.");
+                OpenBench();
+                Check(craft.CanCraft(amulet, out _) && craft.Craft(amulet, out _) && craft.Craft(ward, out _) &&
+                    memory.TrailStep == 3, "Crafted protection advances the local trail.");
+                int shieldSlot = (int)EquipmentSlot.Shield - 1;
+                int itemSlot = Enumerable.Range(0, pack.Model.Capacity).First(i => pack.Model[i].Item == amulet.Output);
+                Check(pack.Equip(itemSlot, shieldSlot), "The mind amulet can be worn in the shield slot.");
+                sanity.Restore(100, 0, true);
+                sanity.Adjust(-20);
+                Check(Mathf.Approximately(sanity.Value, 83), "The worn amulet reduces a 20-point sanity loss to 17.");
+                pack.QuickUnequip(shieldSlot);
+                pack.SetOpen(false);
+                MoveHero(pos);
+                var wardDevice = network.Spawn(ward.Output, pos + Vector3.left * 4);
+                wardDevice.Powered = true;
+                var edge = (Vector2)wardDevice.transform.position + Vector2.right * 6;
+                Check(network.WithinPoweredWard(edge) && !network.WithinPoweredWard(edge + Vector2.right * 0.1f),
+                    "The powered ward protects exactly its six-block radius.");
+                wardDevice.Powered = false;
+                Check(!network.WithinPoweredWard(edge), "An unpowered ward gives no protection.");
+                network.Remove(wardDevice, false);
                 sanity.Restore(15, 0, true);
                 bool visitor = false, retreat = false;
                 int lastSpawn = -100, alive = 0;
@@ -1296,8 +1366,43 @@ namespace BrokenHeart.Editor
                     alive = count;
                 }
                 Check(visitor && retreat, "At 15 sanity one physical shadow can visit, then leaves a recovery window.");
+                for (int i = 0; i < 200 && enemies.Actors.Count == 0; i++) effects.Tick(1);
+                var target = enemies.Actors.Single();
+                var trailSite = world.CellAt(target.transform.position);
+                var vitals = player.GetComponent<PlayerVitals>();
+                vitals.Restore(100);
+                Check(vitals.TryDamage(new DamageHit(DamageKind.Physical, target.gameObject, 6, 2)) &&
+                    memory.HasKnowledge("lore.wound"), "Surviving the physical visitor's strike records a weakness.");
+                var sword = catalog.Find("iron_sword");
+                if (!pack.HasItem(sword)) pack.Collect(sword, 1);
+                int swordSlot = Enumerable.Range(0, pack.Model.Capacity).First(i => pack.Model[i].Item == sword);
+                if (swordSlot != 0) pack.Model.Move(swordSlot, 0);
+                pack.Select(0);
+                MoveHero(Vector3.MoveTowards(target.transform.position, pos, 1.5f));
+                Check(enemies.TryAttack(target.transform.position - player.transform.position) && enemies.Actors.Count == 0,
+                    "A normal iron-sword strike defeats the physical visitor.");
+                var residue = Object.FindObjectsByType<ItemDrop>().Single(d => d.Item.Id == "shadow_residue");
+                Check(residue.TryCollect(pack) == 1 && memory.Knows(sealedLamp) && memory.TrailStep == 4 &&
+                    memory.GiantTrace == trailSite, "Victory drops one residue and records the giant's local trace.");
+                OpenBench();
+                Check(craft.Craft(sealedLamp, out _), "The earned residue crafts a sealed lamp.");
+                var sealedDevice = network.Spawn(sealedLamp.Output, pos + Vector3.right * 4);
+                lamp.DimFor(5); sealedDevice.DimFor(5);
+                Check(Mathf.Approximately(sealedDevice.RemainingDimTime, 2) && Mathf.Approximately(lamp.RemainingDimTime, 5),
+                    "Sealed light dims for two seconds where an ordinary lamp dims for five.");
+                sealedDevice.RestoreLight(); lamp.RestoreLight();
+                pack.SetOpen(false);
+                MoveHero(pos);
+                sanity.Restore(100, 0, true);
+                int earnedXp = pack.Progress.TotalExperience;
+                var learned = save.Capture();
+                save.Restore(learned); save.Restore(learned);
+                Check(memory.Knows(sealedLamp) && memory.TrailStep == 4 && memory.GiantTrace == trailSite &&
+                    pack.Progress.TotalExperience == earnedXp, "Recovered sanity and repeated loads preserve knowledge without duplicate XP.");
                 sanity.Restore(0, 0, true);
                 effects.Tick(31);
+                // A prepared hero may meet a physical visitor before the next breach.
+                for (int i = 0; i < 180 && Visible("Unreal eyes") < 4; i++) effects.Tick(1);
                 Check(Visible("Unreal eyes") == 4 && Visible("Moving shadow") == 1 && player.GetComponent<PlayerVitals>().Health > 0,
                     "Zero sanity starts a survivable breach.");
                 var camera = Camera.main;

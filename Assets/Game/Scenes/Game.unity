@@ -52008,6 +52008,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7d9d52f310580c4a909555b1190701b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BrokenHeart.Systems.MemorySystem
+  book: {fileID: 11400000, guid: 0a4c156f46af4caebc1e1408e2564de0, type: 2}
   inventory: {fileID: 1069310861}
   recipes:
   - {fileID: 11400000, guid: bad53dfb305d4074ab09f8f5e64ed7c3, type: 2}
@@ -52039,6 +52040,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 59a5d12fc236ac60f39674b4944a8061, type: 2}
   - {fileID: 11400000, guid: 12a3b0bbaa3456186cd71281a43ce6aa, type: 2}
   - {fileID: 11400000, guid: 24b0db476c2190bfc1b767e1ac6fc983, type: 2}
+  - {fileID: 11400000, guid: 9828361e819046ee8d33ccfc03065039, type: 2}
+  - {fileID: 11400000, guid: f0f1b025919d4a6690e2392c2eef94a2, type: 2}
+  - {fileID: 11400000, guid: 04c7ed5770bf4f0eb003fe0d43e3bfe6, type: 2}
 --- !u!114 &1069310863
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -52084,6 +52088,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 59a5d12fc236ac60f39674b4944a8061, type: 2}
   - {fileID: 11400000, guid: 12a3b0bbaa3456186cd71281a43ce6aa, type: 2}
   - {fileID: 11400000, guid: 24b0db476c2190bfc1b767e1ac6fc983, type: 2}
+  - {fileID: 11400000, guid: 9828361e819046ee8d33ccfc03065039, type: 2}
+  - {fileID: 11400000, guid: f0f1b025919d4a6690e2392c2eef94a2, type: 2}
+  - {fileID: 11400000, guid: 04c7ed5770bf4f0eb003fe0d43e3bfe6, type: 2}
 --- !u!114 &1069310864
 MonoBehaviour:
   m_ObjectHideFlags: 0

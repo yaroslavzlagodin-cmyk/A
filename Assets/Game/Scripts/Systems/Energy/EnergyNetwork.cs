@@ -39,6 +39,17 @@ namespace BrokenHeart.Systems.Energy
             return null;
         }
 
+        public bool WithinPoweredWard(Vector2 position)
+        {
+            foreach (var device in devices)
+            {
+                float radius = device.Data.wardRadius;
+                if (radius > 0 && device.Powered && ((Vector2)device.transform.position - position).sqrMagnitude <= radius * radius)
+                    return true;
+            }
+            return false;
+        }
+
         public bool CanPlace(Vector2Int cell) =>
             devices.Count < 64 && At(cell) == null && world.Peek(cell) == null &&
             world.IsSolidAt(cell + Vector2Int.down);

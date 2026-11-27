@@ -3,6 +3,7 @@ using BrokenHeart.Inventory;
 using BrokenHeart.Systems.Energy;
 using BrokenHeart.World;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace BrokenHeart.Systems
 {
@@ -24,6 +25,8 @@ namespace BrokenHeart.Systems
         private EnergyNetwork network;
         private PlayerInventory inventory;
         private PlayerVitals vitals;
+        private MemorySystem memory;
+        private bool inspectedLamp;
         private EnemyActor intruder;
         private EnergyDevice dimmed;
         private DemonEvent active;
@@ -38,6 +41,7 @@ namespace BrokenHeart.Systems
             network = world.GetComponent<EnergyNetwork>();
             inventory = observer.GetComponent<PlayerInventory>();
             vitals = observer.GetComponent<PlayerVitals>();
+            memory = observer.GetComponent<MemorySystem>();
             scheduler = new DemonEventScheduler(world.Seed ^ 149);
             if (!hallucinationsEnabled) return;
             for (int i = 0; i < eyes.Length; i++) eyes[i] = Create("Unreal eyes", eyeSprite, Color.white);
@@ -64,14 +68,59 @@ namespace BrokenHeart.Systems
             sanity.Restored += ResetEvents;
             sanity.StageChanged += OnStage;
             vitals.Died += OnDeath;
+            enemies.Defeated += OnDefeated;
+            vitals.SurvivedHit += OnSurvivedHit;
         }
         private void OnDisable()
         {
             sanity.Restored -= ResetEvents;
             sanity.StageChanged -= OnStage;
             vitals.Died -= OnDeath;
+            enemies.Defeated -= OnDefeated;
+            vitals.SurvivedHit -= OnSurvivedHit;
             ResetEvents();
         }
+        private void OnDefeated(EnemyActor actor)
+        {
+            if (actor == intruder && sanity.CanManifest)
+                memory.Record(Discovery.Defeat, world.CellAt(actor.transform.position));
+        }
+
+        private void OnSurvivedHit(DamageHit hit)
+        {
+            if (intruder != null && hit.Source == intruder.gameObject)
+                memory.Record(Discovery.SurviveHit, world.CellAt(observer.position));
+        }
+
+        private bool Near(Transform target, float reach) =>
+            Vector2.Distance(observer.position, target.position) <= reach && enemies.HasSight(observer.position, target.position);
+
+        public bool TryResearch()
+        {
+            if (inventory.Mode != PlayerInputMode.Gameplay) return false;
+            var cell = world.CellAt(observer.position);
+            if (active == DemonEvent.Glimpse && sanity.InResearchRange(SanityStage.Unease) &&
+                shadow.gameObject.activeSelf && Near(shadow.transform, 10))
+                memory.Record(Discovery.Observe, cell);
+            else if (active == DemonEvent.FalseStone && sanity.InResearchRange(SanityStage.Watched) &&
+                phantom.gameObject.activeSelf && Near(phantom.transform, 5))
+                memory.Record(Discovery.Examine, cell);
+            else if (active == DemonEvent.DimLight && sanity.InResearchRange(SanityStage.Pursued) &&
+                dimmed != null && dimmed.Powered && dimmed.IsDimmed && Vector2.Distance(observer.position, dimmed.transform.position) <= 5)
+                inspectedLamp = true;
+            else return false;
+            return true;
+        }
+
+        private DemonEvent ResearchOpportunity() => memory.TrailStep switch
+        {
+            0 when sanity.InResearchRange(SanityStage.Unease) => DemonEvent.Glimpse,
+            1 when sanity.InResearchRange(SanityStage.Watched) => DemonEvent.FalseStone,
+            2 when sanity.InResearchRange(SanityStage.Pursued) && !memory.HasKnowledge("lore.darkness") => DemonEvent.DimLight,
+            3 when sanity.CanManifest => DemonEvent.Intruder,
+            _ => DemonEvent.None
+        };
+
         private void OnDeath(Vector3 _) => ResetEvents();
         private void OnStage(SanityStage stage)
         {
@@ -103,6 +152,7 @@ namespace BrokenHeart.Systems
             if (intruder != null && enemies != null) enemies.Remove(intruder, false);
             intruder = null;
             dimmed = null;
+            inspectedLamp = false;
             active = DemonEvent.None;
         }
 
@@ -113,7 +163,7 @@ namespace BrokenHeart.Systems
             foreach (var device in network.Devices)
             {
                 float distance = (device.transform.position - observer.position).sqrMagnitude;
-                if (!device.Powered || device.Data.consumptionPerSecond <= 0 || distance > limit) continue;
+                if (!device.Powered || device.Data.wardRadius > 0 || device.Data.consumptionPerSecond <= 0 || distance > limit) continue;
                 nearest = device;
                 limit = distance;
             }
@@ -191,7 +241,7 @@ namespace BrokenHeart.Systems
             remaining = effect switch
             {
                 DemonEvent.Intruder => 9,
-                DemonEvent.DimLight => 5,
+                DemonEvent.DimLight => 5 * lamp.Data.dimDurationFactor,
                 DemonEvent.Rift => 8,
                 _ => 6
             };
@@ -213,7 +263,11 @@ namespace BrokenHeart.Systems
             else shadow.transform.position = shadowOrigin + new Vector3(Mathf.Sin(age * 1.3f), Mathf.Sin(age * 2) * 0.12f);
         }
 
-        private void Update() => Tick(Time.deltaTime);
+        private void Update()
+        {
+            if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) TryResearch();
+            Tick(Time.deltaTime);
+        }
 
         public void Tick(float seconds)
         {
@@ -226,6 +280,10 @@ namespace BrokenHeart.Systems
             if (active != DemonEvent.None)
             {
                 remaining -= seconds;
+                if (inspectedLamp && (dimmed == null || !dimmed.Powered ||
+                    Vector2.Distance(observer.position, dimmed.transform.position) > 5)) inspectedLamp = false;
+                if (remaining <= 0 && inspectedLamp)
+                    memory.Record(Discovery.EndureDarkness, world.CellAt(observer.position));
                 age += seconds;
                 if (remaining <= 0 || active == DemonEvent.Intruder && (!sanity.CanManifest || intruder == null) ||
                     active == DemonEvent.Glimpse && !clock.IsNight && sanity.Stage == SanityStage.Unease) EndEvent();
@@ -236,7 +294,8 @@ namespace BrokenHeart.Systems
             var lamp = NearbyLamp();
             bool cave = world.DepthAt(world.CellAt(observer.position)) >= 4;
             var effect = scheduler.Choose(sanity.Stage, clock.IsNight, cave, lamp != null,
-                sanity.CanManifest && !enemies.Peaceful, inventory.Progress.Level);
+                sanity.CanManifest && !enemies.Peaceful, inventory.Progress.Level, ResearchOpportunity(),
+                network.WithinPoweredWard(observer.position));
             StartEvent(effect, lamp);
         }
     }

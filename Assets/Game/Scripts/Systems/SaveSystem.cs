@@ -39,7 +39,8 @@ namespace BrokenHeart.Systems
         public WeatherKind weather;
         public float sanity = 100, awakeSeconds;
         public bool collapsed;
-        public int sanityStage;
+        public int sanityStage, trailStep;
+        public Vector2Int giantTrace;
         internal SaveData Copy() => (SaveData)MemberwiseClone();
     }
     public sealed class SaveSystem : MonoBehaviour
@@ -97,6 +98,7 @@ namespace BrokenHeart.Systems
             slots = WriteSlots(inventory.Model),
             equipment = Enumerable.Range(0, PlayerInventory.EquipmentCount).Select(i => inventory.Equipped(i))
                 .Select(WriteStack).ToArray(),
+            trailStep = memory.TrailStep, giantTrace = memory.GiantTrace,
             memories = memory.Unlocked.ToArray(),
             studyItems = memory.StudyItems.ToArray(),
             knownMaterials = memory.KnownMaterials.ToArray(),
@@ -184,6 +186,7 @@ namespace BrokenHeart.Systems
             if (data == null || data.version != 1 ||
                 (data.generatorVersion < WorldGenerationData.LegacyVersion || data.generatorVersion > WorldGenerationData.CurrentVersion) ||
                 data.slots == null || data.blocks == null || data.memories == null || data.drops == null ||
+                data.trailStep < 0 || data.trailStep > 4 || (data.trailStep == 4 && !world.Bounds.Contains(data.giantTrace)) ||
                 data.selected < 0 || data.selected >= inventory.HotbarSize || data.experience < 0 ||
                 !float.IsFinite(data.position.x) || !float.IsFinite(data.position.y) || !float.IsFinite(data.position.z) ||
                 !world.Bounds.Contains(world.CellAt(data.position)))
@@ -238,6 +241,7 @@ namespace BrokenHeart.Systems
             var network = world.GetComponent<EnergyNetwork>();
             inventory.RestoreLoadout(prepared.Slots, prepared.Equipped);
             memory.Restore(data.memories, data.studyItems, data.knownMaterials);
+            memory.RestoreTrail(data.trailStep, data.giantTrace);
             inventory.Progress.Restore(data.experience);
             inventory.Select(data.selected);
             inventory.GetComponent<SleepSystem>()?.CancelRest();

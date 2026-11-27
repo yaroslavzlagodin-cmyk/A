@@ -23,6 +23,9 @@ namespace BrokenHeart.UI
         private const int SlotSize = 49;
         private InventorySlotActions slots;
         private SlotTarget? hover, drag;
+        private bool journalOpen;
+        private static readonly string[] TrailSteps =
+            { "See the shadow", "Study the anomaly", "Craft mental protection", "Find the giant's trail" };
         private bool split;
         private float storageScroll, recipeScroll;
         private bool draggingStorageScroll, draggingRecipeScroll;
@@ -93,6 +96,7 @@ namespace BrokenHeart.UI
 
         private void Update()
         {
+            if (!inventory.IsOpen) journalOpen = false;
             var station = stations?.OpenStation;
             if (station != shownStation)
             {
@@ -176,6 +180,13 @@ namespace BrokenHeart.UI
                 drag = null;
                 EndSweep();
             }
+            if (Button(At(panel, panel.width - 235, 8, 128, 22), L(journalOpen ? "Back to items" : "Field journal")))
+                ToggleJournal();
+            if (journalOpen)
+            {
+                DrawJournal(panel);
+                return;
+            }
             if (station?.Kind == StationKind.Chest) DrawChest(At(panel, 10, 38, panel.width - 20, 176), station);
             else if (station?.Kind == StationKind.Furnace) DrawFurnace(At(panel, 10, 38, panel.width - 20, 176), station);
             else
@@ -184,6 +195,55 @@ namespace BrokenHeart.UI
                 DrawCrafting(At(panel, 212, 38, panel.width - 222, 176));
             }
             DrawStorage(At(panel, 10, 221, panel.width - 20, 182));
+        }
+
+        public bool ToggleJournal()
+        {
+            if (!inventory.IsOpen) return false;
+            journalOpen = !journalOpen;
+            drag = null;
+            EndSweep();
+            return journalOpen;
+        }
+
+        private void DrawJournal(Rect panel)
+        {
+            Label(At(panel, 14, 40, 540, 24), L("The giant's trail"), 18, Gold, bold: true);
+            for (int i = 0; i < TrailSteps.Length; i++)
+                Label(At(panel, 18, 68 + i * 19, 535, 19), (i < memory.TrailStep ? "✓  " : "·  ") + L(TrailSteps[i]), 13,
+                    i < memory.TrailStep ? Mint : i == memory.TrailStep ? Text : Soft);
+            string hint = memory.TrailStep switch
+            {
+                0 => "At night, press R near a moving silhouette at 51–70 sanity.",
+                1 => "At 31–50 sanity, press R within five blocks of a false stone.",
+                2 when !memory.HasKnowledge("lore.darkness") => "At 16–30 sanity, press R near a dimmed powered lamp. Stay until the light returns.",
+                2 => "At a workbench, craft a Mind Amulet or Hearth Ward.",
+                3 => "At 15 sanity or less, defeat a physical shadow in darkness. Choose a non-peaceful world.",
+                _ => "The tracks begin here"
+            };
+            string trail = memory.TrailStep == 4 ? $"  ({memory.GiantTrace.x}, {memory.GiantTrace.y})" : "";
+            JournalText(At(panel, 18, 147, 532, 38), L(hint) + trail);
+            Label(At(panel, 14, 190, 530, 21), L("Field notes"), 16, Gold, bold: true);
+            if (memory.Journal.Count == 0 || !memory.HasKnowledge("lore.outline"))
+            {
+                Label(At(panel, 18, 214, 530, 28), L("Your first observation will appear here."), 13, Soft);
+                return;
+            }
+            float row = 213;
+            foreach (var entry in memory.Journal)
+            {
+                if (!memory.HasKnowledge(entry.id)) continue;
+                JournalText(At(panel, 18, row, 531, 32), L(entry.title) + " — " + L(entry.description));
+                row += 32;
+            }
+        }
+
+        private GUIStyle journalStyle;
+        private void JournalText(Rect rect, string value)
+        {
+            journalStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true, alignment = TextAnchor.MiddleLeft };
+            journalStyle.normal.textColor = Text;
+            GUI.Label(rect, value, journalStyle);
         }
 
         private void DrawChest(Rect pane, Workstation chest)
@@ -503,11 +563,19 @@ namespace BrokenHeart.UI
                     if (!stack.Empty && stack.Item.Protection > 0)
                         detail = $"  −{stack.Item.Protection:P0} {L("damage")}";
                     bool canStudy = memory != null && memory.CanStudy(stack.Item);
-                    int height = canStudy ? 42 : 23;
+                    string usage = stack.Item?.Id switch
+                    {
+                        "mind_amulet" => "Shield slot · 15% less sanity loss",
+                        "hearth_ward" => "Powered · 50% fewer intrusions within 6 blocks",
+                        "sealed_lamp" => "Dimming lasts 2 seconds",
+                        _ => null
+                    };
+                    int height = canStudy || usage != null ? 42 : 23;
                     var tip = new Rect(Mathf.Min(pointer.x + 14, Width - 232), Mathf.Min(pointer.y + 14, Height - height - 3), 220, height);
                     Plate(tip, Line, Ink);
                     Label(At(tip, 6, 0, 210, 23), L(name) + detail, 12, Text);
-                    if (canStudy)
+                    if (usage != null) Label(At(tip, 6, 22, 210, 17), L(usage), 10, Mint);
+                    else if (canStudy)
                         Label(At(tip, 6, 22, 210, 17), L("Shift + LMB · Study"), 11, Gold);
                 }
             }

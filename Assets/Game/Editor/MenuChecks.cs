@@ -211,8 +211,25 @@ namespace BrokenHeart.Editor
                     case 29:
                         Check(menu != null && menu.Page == "characters" && Time.timeScale == 1 && !SessionContext.Active,
                             "Exit to character selection opens the hero library and clears the game session.");
-                        Finish("COMPLETE");
+                        menu.Launch(world, first);
                         break;
+                    case 30:
+                        var journalSave = Object.FindAnyObjectByType<SaveSystem>();
+                        var journalState = journalSave.Capture();
+                        var journalMemory = Object.FindAnyObjectByType<MemorySystem>();
+                        journalState.memories = journalState.memories.Concat(journalMemory.Journal.Select(entry => entry.id)).ToArray();
+                        journalState.trailStep = 4;
+                        journalState.giantTrace = new Vector2Int(7, 1);
+                        journalSave.Restore(journalState);
+                        Object.FindAnyObjectByType<PlayerInventory>().SetOpen(true);
+                        Check(Object.FindAnyObjectByType<PrototypeHud>().ToggleJournal(), "The inventory opens the completed field journal.");
+                        break;
+                    case 31: Shot("FieldJournal-uk"); break;
+                    case 32:
+                        Check(!Object.FindAnyObjectByType<PrototypeHud>().ToggleJournal(), "The journal returns to the inventory.");
+                        Object.FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(false);
+                        break;
+                    case 33: Finish("COMPLETE"); break;
                 }
             }
             catch(Exception error){Finish("FAIL: "+error);}
@@ -261,7 +278,9 @@ namespace BrokenHeart.Editor
                 "Paused monster encounters award no experience.");
 
             var focus = crafting.Recipes.Single(recipe => recipe.Id == "crystal_focus");
-            memory.UnlockMindProtection();
+            var oldHero = save.Capture();
+            oldHero.memories = oldHero.memories.Concat(new[] { "memory.mind_protection" }).ToArray();
+            save.Restore(oldHero);
             Check(!memory.Knows(focus) && memory.HasUnknownMaterials(focus),
                 "The mind-protection story memory does not identify recipe ingredients.");
             save.Restore(original);

@@ -27,7 +27,7 @@ namespace BrokenHeart.Editor
             var sanity=GetOrAdd<SanitySystem>(inventory.gameObject);var sleep=GetOrAdd<SleepSystem>(inventory.gameObject);
             Set(sleep,"sanity",sanity);Set(sleep,"motor",inventory.GetComponent<PlayerMotor>());Set(sleep,"inventory",inventory);
             Set(sleep,"vitals",inventory.GetComponent<PlayerVitals>());Set(sleep,"enemies",world.GetComponent<EnemySystem>());
-            Set(sleep,"memory",inventory.GetComponent<MemorySystem>());Set(sleep,"mindFocus",inventory.Catalog.Find("crystal_focus"));
+            Set(sleep,"mindFocus",inventory.Catalog.Find("crystal_focus"));
             var effects=GetOrAdd<SanityVisuals>(world.gameObject);Set(effects,"sanity",sanity);Set(effects,"observer",inventory.transform);Set(effects,"world",world);
             Set(effects,"manifestation",AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/Game/Data/DemonShadow.asset"));
             Set(effects,"eyeSprite",MakeIcon("UnrealEyes",new Color(0.9f,0.8f,0.65f),5));
@@ -166,7 +166,7 @@ namespace BrokenHeart.Editor
                 MakeRecipe("crystal_focus", RecipeCategory.Magic, focus, 1, (stone, 8), (grass, 2)),
                 MakeRecipe("crystal_generator", RecipeCategory.Mechanisms, generator, 1, (stone, 10), (dirt, 4)) };
             var memory = GetOrAdd<MemorySystem>(inventory.gameObject);
-            Set(memory, "inventory", inventory); SetArray(memory, "recipes", recipes);
+            Set(memory, "book", AssetDatabase.LoadAssetAtPath<KnowledgeBook>("Assets/Game/Data/FieldJournal.asset")); Set(memory, "inventory", inventory); SetArray(memory, "recipes", recipes);
             var crafting = GetOrAdd<CraftingSystem>(inventory.gameObject);
             Set(crafting, "inventory", inventory); Set(crafting, "memory", memory); SetArray(crafting, "recipes", recipes);
             var hud = Object.FindAnyObjectByType<PrototypeHud>();

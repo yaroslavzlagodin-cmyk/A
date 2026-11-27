@@ -28,6 +28,7 @@ namespace BrokenHeart.Combat
         private float swingTime;
         private float spawnIn=18,attackIn;
         public IReadOnlyList<EnemyActor> Actors=>actors;
+        public event System.Action<EnemyActor> Defeated;
         public EnemyData[] Types=>types;
         public bool Peaceful { get; set; }
         public float DamageMultiplier { get; set; } = 1;
@@ -149,7 +150,7 @@ namespace BrokenHeart.Combat
             if (energy == null) return found;
             foreach (var device in energy.Devices)
             {
-                if (!device.Powered || device.IsDimmed || device.Data.consumptionPerSecond <= 0) continue;
+                if (!device.Powered || device.Data.wardRadius > 0 || device.IsDimmed || device.Data.consumptionPerSecond <= 0) continue;
                 Vector2 source = device.transform.position;
                 float distance = (source - position).sqrMagnitude;
                 if (distance >= nearest || !HasSight(position, source)) continue;
@@ -199,6 +200,7 @@ namespace BrokenHeart.Combat
             {
                 world.GetComponent<DropSpawner>().Spawn(actor.Data.drop, 1, actor.transform.position, player.GetComponent<Collider2D>());
                 inventory.Progress.Gain(20);
+                Defeated?.Invoke(actor);
             }
             actor.gameObject.SetActive(false); Destroy(actor.gameObject);
         }

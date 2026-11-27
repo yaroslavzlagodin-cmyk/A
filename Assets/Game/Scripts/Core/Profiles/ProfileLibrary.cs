@@ -39,7 +39,7 @@ namespace BrokenHeart.Core.Profiles
         public bool collapsed;
         public int sanityStage;
     }
-    [Serializable] public sealed class JourneyPosition { public string worldId,characterId; public Vector3 position; }
+    [Serializable] public sealed class JourneyPosition { public string worldId,characterId; public Vector3 position; public int trailStep; public Vector2Int giantTrace; }
     [Serializable] public sealed class LibraryData
     {
         public int version=1;

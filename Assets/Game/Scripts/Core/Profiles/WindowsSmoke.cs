@@ -82,6 +82,7 @@ namespace BrokenHeart.Core.Profiles
                     save != null && save.Status == "Save loaded", "The selected fresh world must load.");
                 Debug.Log("WINDOWS SMOKE: Lobby and fresh world passed.");
 
+                CheckWardChance();
                 await CheckSharedWorld(world, inventory);
                 await CheckAutosaves();
                 await CheckDeaths();
@@ -91,6 +92,20 @@ namespace BrokenHeart.Core.Profiles
                 Application.Quit(0);
             }
             catch (Exception error) { Fail(error); }
+        }
+
+        private static void CheckWardChance()
+        {
+            int admitted = 0;
+            for (int seed = 0; seed < 512; seed++)
+            {
+                DemonEvent Trial(bool warded) => new DemonEventScheduler(seed).Choose(SanityStage.Manifestation,
+                    true, false, false, true, 1, DemonEvent.Intruder, warded);
+                Require(Trial(false) == DemonEvent.Intruder, "An unwarded research encounter should proceed.");
+                if (Trial(true) == DemonEvent.Intruder) admitted++;
+            }
+            Require(admitted >= 200 && admitted <= 312, "A ward must repel about half the visitors and still allow encounters.");
+            Debug.Log($"WINDOWS SMOKE: Ward admitted {admitted} of 512 eligible invasions.");
         }
 
         private async Awaitable CheckSharedWorld(BlockWorld world, PlayerInventory inventory)
@@ -110,6 +125,10 @@ namespace BrokenHeart.Core.Profiles
             inventory.Model.SetSlot(inventory.Model.Capacity - 1, new ItemStack(copper, 4));
             inventory.Select(selected);
             var mind = inventory.GetComponent<SanitySystem>();
+            var notes = inventory.GetComponent<MemorySystem>();
+            notes.Record(Discovery.Observe, cell);
+            notes.Record(Discovery.Examine, cell);
+            notes.Record(Discovery.EndureDarkness, cell);
             mind.Restore(30, 0, false);
             mind.Adjust(1);
             MoveHero(inventory, FirstPosition);
@@ -125,6 +144,8 @@ namespace BrokenHeart.Core.Profiles
             save = world.GetComponent<SaveSystem>();
             Require(save.Status == "Save loaded" && world.Store.Get(cell) == block &&
                 inventory.Model.Count(inventory.Catalog.Find("copper_ingot")) == 0 &&
+                !inventory.GetComponent<MemorySystem>().HasKnowledge("lore.outline") &&
+                inventory.GetComponent<MemorySystem>().TrailStep == 0 &&
                 inventory.Model.Capacity == inventory.BaseCapacity && inventory.GetComponent<SanitySystem>().Stage == SanityStage.Calm &&
                 Mathf.Approximately(inventory.transform.position.x, 0.5f),
                 "A new hero must see the world edit and receive an independent inventory and spawn.");
@@ -156,6 +177,17 @@ namespace BrokenHeart.Core.Profiles
             Require(FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(false), "Could not exit the second hero's session.");
             await WaitForScene("Menu");
 
+            var otherWorld = new WorldProfile { name = "Second research site", seed = "150", difficulty = 2 };
+            var library = ProfileLibrary.Load();
+            library.worlds.Add(otherWorld);
+            ProfileLibrary.Save(library);
+            FindAnyObjectByType<FrontEndMenu>().Launch(otherWorld, character);
+            await WaitForScene("Game");
+            var otherNotes = FindAnyObjectByType<MemorySystem>();
+            Require(otherNotes.HasKnowledge("lore.darkness") && otherNotes.TrailStep == 0,
+                "A returning hero keeps research in a new world and starts a separate trail.");
+            Require(FindAnyObjectByType<SessionGameBootstrap>().ReturnToMenu(true), "Could not save the other world.");
+            await WaitForScene("Menu");
             FindAnyObjectByType<FrontEndMenu>().Launch(worldProfile, character);
             await WaitForScene("Game");
             inventory = FindAnyObjectByType<PlayerInventory>();
@@ -163,6 +195,7 @@ namespace BrokenHeart.Core.Profiles
             Require(FindAnyObjectByType<SaveSystem>().Status == "Save loaded" &&
                 FindAnyObjectByType<BlockWorld>().Store.Get(cell) == block && inventory.SelectedIndex == selected &&
                 Mathf.Approximately(inventory.transform.position.x, FirstPosition.x) &&
+                inventory.GetComponent<MemorySystem>().TrailStep == 2 && inventory.GetComponent<MemorySystem>().HasKnowledge("lore.darkness") &&
                 inventory.GetComponent<SanitySystem>().Stage == SanityStage.Pursued &&
                 Mathf.Approximately(inventory.GetComponent<SanitySystem>().Value, 31) &&
                 inventory.Equipped(backpackSlot).Item == inventory.Catalog.Find("trail_backpack") &&

@@ -267,3 +267,39 @@ Shift + ЛКМ · Вивчити	Shift + LMB · Study
 Зберегти перед виходом?	Save before leaving?
 Зберегти й вийти	Save and exit
 Вийти без збереження	Exit without saving
+Польовий журнал	Field journal
+До речей	Back to items
+Слід велетня	The giant's trail
+Побачити тінь	See the shadow
+Дослідити аномалію	Study the anomaly
+Виготовити ментальний захист	Craft mental protection
+Знайти слід велетня	Find the giant's trail
+Нотатки	Field notes
+Тут з’явиться перше спостереження.	Your first observation will appear here.
+Уночі за глузду 51–70 натисни R поруч із рухомим силуетом.	At night, press R near a moving silhouette at 51–70 sanity.
+За глузду 31–50 натисни R у межах п’яти блоків від фальшивого каменя.	At 31–50 sanity, press R within five blocks of a false stone.
+За глузду 16–30 натисни R біля пригаслої живленої лампи й залишайся, доки світло повернеться.	At 16–30 sanity, press R near a dimmed powered lamp. Stay until the light returns.
+На верстаку виготов амулет розуму або оберіг оселі.	At a workbench, craft a Mind Amulet or Hearth Ward.
+За глузду 15 або нижче перемож фізичну тінь у темряві. Для цього потрібен немирний світ.	At 15 sanity or less, defeat a physical shadow in darkness. Choose a non-peaceful world.
+Тут починається слід	The tracks begin here
+Тінь спостерігає	The watching shadow
+Бліді очі й темний силует з’являються вночі за глузду 70. Зблизька очі зникають.	Pale eyes and a dark silhouette appear at night as sanity falls to 70. The eyes vanish up close.
+Фальшивий камінь	False stone
+Імітація не має ваги. Підійди повільно й оглянь її до зникнення.	The imitation has no weight. Approach slowly and examine it before it fades.
+Світло в пітьмі	Light in the dark
+Лампа знову загоряється. На верстаку можна зробити амулет розуму й оберіг оселі.	The lamp comes back on. At a workbench, craft a Mind Amulet or a Hearth Ward.
+Попереджувальний спалах	The warning flash
+Перед ударом тінь спалахує. Відійди або відгородися міцною стіною.	A physical shadow flashes before it strikes. Step back or put a solid wall between you.
+Захищене світло	Sealed light
+Фізичні тіні з’являються за глузду 15 або нижче. Їхнім залишком можна захистити лампу від тривалого згасання.	Physical shadows form at 15 sanity or less. Their residue can seal a lamp against prolonged dimming.
+Відбитки велетня	Footprints of the giant
+Цим світом пройшла більша тінь. Журнал зберігає місце зустрічі.	A greater shadow passed through this world. The journal records the site of the encounter.
+Велетень залишив слід.	The giant left a trail.
+Амулет розуму	Mind Amulet
+Оберіг оселі	Hearth Ward
+Захищена лампа	Sealed Lamp
+Тіньовий залишок	Shadow Residue
+Потрібні польові знання	Requires field research
+Слот щита · −15% втрати глузду	Shield slot · 15% less sanity loss
+Діє від живлення · −50% вторгнень, 6 блоків	Powered · 50% fewer intrusions within 6 blocks
+Пригасання триває 2 секунди	Dimming lasts 2 seconds

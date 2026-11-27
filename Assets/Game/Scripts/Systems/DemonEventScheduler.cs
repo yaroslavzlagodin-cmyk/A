@@ -31,14 +31,16 @@ namespace BrokenHeart.Systems
             return elapsed >= nextAt;
         }
 
-        internal DemonEvent Choose(SanityStage stage, bool night, bool cave, bool lamp, bool canManifest, int level)
+        internal DemonEvent Choose(SanityStage stage, bool night, bool cave, bool lamp, bool canManifest, int level, DemonEvent preferred, bool warded)
         {
             bool dark = night || cave;
             DemonEvent chosen = DemonEvent.None;
             int total = 0;
+            bool preferredAvailable = false;
             void Offer(DemonEvent option, int weight)
             {
                 if (availableAt[(int)option] > elapsed) return;
+                if (option == preferred) preferredAvailable = true;
                 total += weight;
                 if (random.Next(total) < weight) chosen = option;
             }
@@ -55,7 +57,8 @@ namespace BrokenHeart.Systems
                 if (lamp) Offer(DemonEvent.DimLight, 6);
             }
             if (canManifest && dark) Offer(DemonEvent.Intruder, 6 + Mathf.Clamp(level, 1, 5));
-            if (stage == SanityStage.Breach && availableAt[(int)DemonEvent.Rift] <= elapsed)
+            if (preferredAvailable) chosen = preferred;
+            else if (stage == SanityStage.Breach && availableAt[(int)DemonEvent.Rift] <= elapsed)
                 chosen = DemonEvent.Rift;
             float intensity = (int)stage / 5f;
             nextAt = elapsed + Mathf.Lerp(15, 10, intensity) + (float)random.NextDouble() * 12;
@@ -67,7 +70,8 @@ namespace BrokenHeart.Systems
                     DemonEvent.DimLight => 32,
                     _ => 15
                 });
-            return chosen;
+            // A ward repels half of the selected intrusions. The normal cooldown still applies.
+            return chosen == DemonEvent.Intruder && warded && random.Next(2) == 0 ? DemonEvent.Glimpse : chosen;
         }
 
         internal int Side() => random.Next(2) == 0 ? -1 : 1;

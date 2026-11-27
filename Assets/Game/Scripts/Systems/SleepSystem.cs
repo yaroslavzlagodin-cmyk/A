@@ -12,16 +12,14 @@ namespace BrokenHeart.Systems
         [SerializeField] private PlayerInventory inventory;
         [SerializeField] private PlayerVitals vitals;
         [SerializeField] private EnemySystem enemies;
-        [SerializeField] private MemorySystem memory;
         [SerializeField] private ItemData mindFocus;
         public bool Resting { get; private set; }
         public string Status { get; private set; } = "";
         public event System.Action RestCompleted;
         private float restSeconds;
-        private void OnEnable(){vitals.Damaged+=OnDamaged; sanity.FirstCollapse+=OnCollapse;}
-        private void OnDisable(){vitals.Damaged-=OnDamaged; sanity.FirstCollapse-=OnCollapse; CancelRest();}
+        private void OnEnable(){vitals.Damaged+=OnDamaged;}
+        private void OnDisable(){vitals.Damaged-=OnDamaged; CancelRest();}
         private void OnDamaged(float damage){CancelRest();}
-        private void OnCollapse(){memory.UnlockMindProtection();}
         public bool TryRest()
         {
             if (inventory.Mode != PlayerInputMode.Gameplay) return false;

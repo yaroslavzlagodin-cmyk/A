@@ -29,6 +29,7 @@ namespace BrokenHeart.Combat
         public float Health { get; private set; } = 100;
         public event Action<float> Damaged;
         public event Action<Vector3> Died;
+        public event Action<DamageHit> SurvivedHit;
         public float DamageMultiplier { get; set; } = 1;
         private float vulnerableAt;
         private PlayerInventory inventory;
@@ -75,6 +76,7 @@ namespace BrokenHeart.Combat
                     Health = 100;
                     Died?.Invoke(deathPosition);
                 }
+                else SurvivedHit?.Invoke(hit);
             }
             finally { resolvingHit = false; }
             return true;

@@ -49,6 +49,8 @@ namespace BrokenHeart.Core.Profiles
                     library.journeys.Add(journey);
                 }
                 journey.position = data.position;
+                journey.trailStep = data.trailStep;
+                journey.giantTrace = data.giantTrace;
                 library.lastWorld = World.id;
                 library.lastCharacter = character.id;
                 snapshot.WriteWorld(World.id, data);
@@ -81,7 +83,10 @@ namespace BrokenHeart.Core.Profiles
                 data.awakeSeconds = character.awakeSeconds;
                 data.collapsed = character.collapsed;
                 data.sanityStage = character.sanityStage;
-                data.position = library.journeys.Find(j => j.worldId == World.id && j.characterId == character.id)?.position
+                var journey = library.journeys.Find(j => j.worldId == World.id && j.characterId == character.id);
+                data.trailStep = journey?.trailStep ?? 0;
+                data.giantTrace = journey?.giantTrace ?? default;
+                data.position = journey?.position
                     ?? new Vector3(0.5f, 4, 0);
 
                 validate(data);

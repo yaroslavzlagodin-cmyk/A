@@ -62,6 +62,7 @@ namespace BrokenHeart.Crafting
             next = null;
             if (recipe == null || System.Array.IndexOf(recipes, recipe) < 0) { reason = "Unknown recipe"; return false; }
             if (!AvailableHere(recipe)) { reason = "Requires a workbench"; return false; }
+            if (!memory.MeetsKnowledge(recipe)) { reason = "Requires field research"; return false; }
             if (!memory.CanView(recipe)) { reason = "Unlearned recipe"; return false; }
             if (memory.HasUnknownMaterials(recipe)) { reason = "Undiscovered materials"; return false; }
             next = recipe.AfterSpendingMaterials(inventory.Model);
